@@ -106,31 +106,40 @@ export function ConfirmDialog() {
             <View style={{ height: 12 }} />
           )}
 
-          <View style={{ flexDirection: "row", gap: 10 }}>
+          <View style={{ flexDirection: "row", gap: 14 }}>
+            {/* Secondary — outline */}
             <Pressable
               onPress={dismiss}
               style={({ pressed }) => ({
                 flex: 1,
-                paddingVertical: 13,
-                borderRadius: 13,
+                paddingVertical: 14,
+                borderRadius: 14,
                 alignItems: "center",
+                justifyContent: "center",
                 borderWidth: 1.5,
-                borderColor: "rgba(255,255,255,0.12)",
-                backgroundColor: "rgba(255,255,255,0.04)",
-                opacity: pressed ? 0.7 : 1,
+                borderColor: "rgba(255,255,255,0.18)",
+                backgroundColor: "transparent",
+                opacity: pressed ? 0.6 : 1,
               })}
             >
               <Text style={{ fontSize: 15, fontWeight: "600", color: "#e5e7eb" }}>{cancelText}</Text>
             </Pressable>
+            {/* Primary — solid accent (red for destructive) */}
             <Pressable
               onPress={accept}
               style={({ pressed }) => ({
                 flex: 1,
-                paddingVertical: 13,
-                borderRadius: 13,
+                paddingVertical: 14,
+                borderRadius: 14,
                 alignItems: "center",
+                justifyContent: "center",
                 backgroundColor: accent,
                 opacity: pressed ? 0.85 : 1,
+                shadowColor: accent,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.4,
+                shadowRadius: 10,
+                elevation: 6,
               })}
             >
               <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>{confirmText}</Text>
