@@ -6,7 +6,7 @@
  * as a secure vault entry (revealed only on the app-lock-protected vault page).
  * CVV is never collected — it's a sensitive value we don't store.
  */
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -103,6 +103,15 @@ export default function AddCardScreen() {
   const [network, setNetwork]       = useState(existing?.network ?? "");
   const [expiry, setExpiry]         = useState(existing?.expiry ?? "");
   const [limit, setLimit]           = useState(existing ? String(existing.limit) : "");
+
+  // The profile name may hydrate after this screen mounts (async sync), so the
+  // initial useState above can capture an empty name. Fill the holder once the
+  // name arrives — only when adding a new card and the field is still untouched.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!existing && !cardHolder && fullName) setCardHolder(fullName);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fullName]);
   const [saving, setSaving]         = useState(false);
 
   const setExpiryFmt = (v: string) => {
