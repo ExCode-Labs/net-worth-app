@@ -213,7 +213,7 @@ export default function CardsScreen() {
                 return (
                   <TouchableOpacity
                     key={c.id}
-                    onPress={() => setSelId(c.id)}
+                    onPress={() => router.push(`/add-card?id=${c.id}`)}
                     className="flex-row items-center gap-3 bg-white/[0.05] rounded-[14px] p-[14px] border border-white/[0.08]"
                     activeOpacity={0.75}
                   >
