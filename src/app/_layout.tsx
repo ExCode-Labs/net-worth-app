@@ -151,6 +151,8 @@ function RouteGate() {
       <Stack.Screen name="edit-transaction" />
       <Stack.Screen name="preferences" />
       <Stack.Screen name="security" />
+      <Stack.Screen name="edit-profile" />
+      <Stack.Screen name="sessions" />
       <Stack.Screen name="sharing" />
       <Stack.Screen name="share-select" />
       <Stack.Screen name="shared/[ownerId]" />

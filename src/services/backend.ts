@@ -57,10 +57,14 @@ export async function updateMe(patch: {
   currency?: string;
   guestName?: string;
   phone?: string;
-}): Promise<void> {
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  avatarUrl?: string;
+}): Promise<MeDto | void> {
   if (!apiEnabled) return;
   try {
-    await apiPatch("/me", patch);
+    return await apiPatch<MeDto>("/me", patch);
   } catch {
     markDirty();
   }

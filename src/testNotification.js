@@ -277,7 +277,7 @@ function getRandomMessages(list, count = 5) {
   return arr.slice(0, count);
 }
 
-const messages = getRandomMessages(smsList, 15);
+const messages = getRandomMessages(smsList, 5);
 
 function sendSms(sender, message) {
   const escapedMessage = message.replace(/"/g, '\\"');

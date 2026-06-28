@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, ScrollView, TouchableOpacity, Image } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -9,7 +9,8 @@ import { useAccountStore, selectNetWorth, selectTotalAssets } from "@/store/acco
 import { useLiabilityStore, selectTotalLiabilities } from "@/store/liabilityStore";
 import { useCardStore, selectTotalUsage } from "@/store/cardStore";
 import { fmtShort } from "@/utils/formatters";
-import { cosmicAvatarUrl } from "@/utils/avatar";
+import { Avatar } from "@/components/ui/Avatar";
+import { logout } from "@/services/auth";
 import { toast } from "@/store/toastStore";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
@@ -42,6 +43,7 @@ const SECTIONS: {
       { icon: "notifications-outline",     label: "Notifications",     sub: "Alerts, reminders & limits" },
       { icon: "lock-closed-outline",       label: "Vault",             sub: "Full card & account numbers", accent: "#a855f7", onPress: () => router.push("/vault") },
       { icon: "shield-checkmark-outline",  label: "Security",          sub: "App lock, PIN & biometrics", accent: "#4ade80", onPress: () => router.push("/security") },
+      { icon: "phone-portrait-outline",    label: "Devices",           sub: "Active sessions & sign-out", accent: "#3b82f6", onPress: () => router.push("/sessions") },
       { icon: "share-social-outline",      label: "Sharing",           sub: "Share balances & more with people", accent: "#a855f7", onPress: () => router.push("/sharing") },
     ],
   },
@@ -59,10 +61,9 @@ export default function ProfileScreen() {
 
   const displayName  = fullName ?? profileFirst ?? guestName ?? (isGuest ? "Guest" : "You");
   const displayEmail = email ?? (isGuest ? "Guest Mode · No account" : "");
-  const firstName    = profileFirst ?? guestName ?? displayName;
-  const imageUrl     = avatarUrl ?? cosmicAvatarUrl(firstName);
 
   const handleLogout = async () => {
+    await logout();          // revoke this session server-side (best-effort)
     resetUser();
     await signOut();
     router.replace("/(auth)/login");
@@ -84,12 +85,16 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Avatar section — Clerk photo or generated cosmic initials avatar */}
+        {/* Avatar section — profile photo if present, else local initials */}
         <View className="items-center py-6 gap-1.5">
-          <Image
-            source={{ uri: imageUrl }}
-            className="w-20 h-20 rounded-full mb-1.5 border-2 border-accent-purple/30"
-          />
+          <View className="mb-1.5">
+            <Avatar
+              name={displayName}
+              uri={avatarUrl ?? undefined}
+              size="xl"
+              style={{ borderRadius: 999, borderWidth: 2, borderColor: "rgba(168,85,247,0.35)" }}
+            />
+          </View>
 
           <Text className="text-[20px] font-bold text-white">{displayName}</Text>
           {displayEmail ? <Text className="text-sm text-muted">{displayEmail}</Text> : null}
@@ -109,6 +114,7 @@ export default function ProfileScreen() {
           )}
           {!isGuest && (
             <TouchableOpacity
+              onPress={() => router.push("/edit-profile")}
               className="flex-row items-center gap-1.5 mt-1.5 px-4 py-2 rounded-full border border-accent-purple/35"
               style={{ backgroundColor: "rgba(168,85,247,0.08)" }}
             >

@@ -1,4 +1,4 @@
-import { apiPost, apiEnabled } from "@/services/api";
+import { apiGet, apiPost, apiDelete, apiEnabled } from "@/services/api";
 import type { MeDto } from "@/services/backend";
 import { useAuthStore } from "@/store/authStore";
 import { useUserStore } from "@/store/userStore";
@@ -7,6 +7,15 @@ export interface SessionResult {
   accessToken:  string;
   refreshToken: string;
   user: MeDto;
+}
+
+export interface DeviceSession {
+  id:         string;
+  device:     string | null;
+  ipAddress:  string | null;
+  createdAt:  string;
+  lastUsedAt: string;
+  current:    boolean;
 }
 
 function requireApi() {
@@ -81,4 +90,34 @@ export async function finishLogin(result: SessionResult): Promise<void> {
     email:     user.email,
     avatarUrl: user.avatarUrl,
   });
+}
+
+// ── Active sessions / devices ─────────────────────────────────────────────────
+
+/** List the user's active login sessions (devices). */
+export async function listSessions(): Promise<DeviceSession[]> {
+  requireApi();
+  return apiGet<DeviceSession[]>("/auth/sessions");
+}
+
+/** Revoke (sign out) a specific session by id. */
+export async function revokeSession(id: string): Promise<void> {
+  requireApi();
+  await apiDelete(`/auth/sessions/${id}`);
+}
+
+/** Sign out the current device (revokes this session server-side). */
+export async function logout(): Promise<void> {
+  if (!apiEnabled) return;
+  try {
+    await apiPost("/auth/logout", {});
+  } catch {
+    // best-effort — local sign-out proceeds regardless
+  }
+}
+
+/** Sign out everywhere (revokes all sessions for the user). */
+export async function logoutAll(): Promise<void> {
+  requireApi();
+  await apiPost("/auth/logout-all", {});
 }
