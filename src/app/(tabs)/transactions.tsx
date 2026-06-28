@@ -12,7 +12,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import MonthCalendar, { dayKey, type DayTotal } from "@/components/transactions/MonthCalendar";
 import { Chip } from "@/components/ui/Chip";
-import { useTransactionStore } from "@/store/transactionStore";
+import { useTransactionStore, type Transaction } from "@/store/transactionStore";
+import { confirm } from "@/store/confirmStore";
+import { toast } from "@/store/toastStore";
 import { useAccountStore, isOrphanTransaction } from "@/store/accountStore";
 import { useCardStore, isOrphanCardTransaction } from "@/store/cardStore";
 import {
@@ -232,16 +234,16 @@ export default function TransactionsScreen() {
 
         {/* Orphan banners */}
         <MissingTargetBanner
-          count={orphanAccounts.length}
           noun="account"
           items={missingAccounts}
+          txns={orphanAccounts}
           route="/add-account"
           icon="git-branch-outline"
         />
         <MissingTargetBanner
-          count={orphanCards.length}
           noun="card"
           items={missingCards}
+          txns={orphanCards}
           route="/add-card"
           icon="card-outline"
         />
@@ -300,15 +302,31 @@ export default function TransactionsScreen() {
 
 // ── "Add the missing account/card" prompt ──────────────────────────────────────
 function MissingTargetBanner({
-  count, noun, items, route, icon,
+  noun, items, txns, route, icon,
 }: {
-  count: number;
   noun: "account" | "card";
   items: { bank: string; last4: string }[];
+  txns: Transaction[];
   route: "/add-account" | "/add-card";
   icon: React.ComponentProps<typeof Ionicons>["name"];
 }) {
   if (items.length === 0) return null;
+  const count = txns.length;
+
+  const rejectAll = () => {
+    confirm({
+      title: `Reject ${count} transaction${count !== 1 ? "s" : ""}?`,
+      message: `These notification transactions from ${noun}s you haven't added will be permanently deleted.`,
+      confirmText: "Reject all",
+      destructive: true,
+      onConfirm: () => {
+        const remove = useTransactionStore.getState().removeTransaction;
+        txns.forEach((t) => remove(t.id));
+        toast.success(`${count} transaction${count !== 1 ? "s" : ""} rejected.`);
+      },
+    });
+  };
+
   return (
     <View
       className="mx-5 mb-3 px-4 py-3 rounded-[12px] border border-accent-purple/30"
@@ -324,7 +342,7 @@ function MissingTargetBanner({
       <Text className="text-xs text-dim mb-3">
         Add the {noun} to link these and track {noun === "card" ? "its usage" : "its balance"}.
       </Text>
-      <View className="flex-row flex-wrap gap-2">
+      <View className="flex-row flex-wrap gap-2 items-center">
         {items.map((m) => (
           <Chip
             key={`${m.bank}|${m.last4}`}
@@ -334,6 +352,10 @@ function MissingTargetBanner({
           />
         ))}
       </View>
+      <TouchableOpacity onPress={rejectAll} className="self-start mt-3 flex-row items-center gap-1.5" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <Ionicons name="trash-outline" size={14} color="#f87171" />
+        <Text className="text-xs font-semibold text-accent-red">Reject all</Text>
+      </TouchableOpacity>
     </View>
   );
 }
