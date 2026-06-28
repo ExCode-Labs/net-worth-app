@@ -186,8 +186,8 @@ export default function AddCardScreen() {
     <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-cosmic-darker">
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={0}
       >
         {/* Header */}
         <View className="flex-row items-center justify-between px-xl pt-3 pb-[14px]">

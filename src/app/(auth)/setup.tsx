@@ -337,8 +337,11 @@ export default function SetupScreen() {
     <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-cosmic-darker">
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
+        // Android already resizes the window for the keyboard (Expo
+        // softwareKeyboardLayoutMode: "resize"); using "height" on top of that
+        // double-adjusts and leaves residual space after an open/close cycle.
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={0}
       >
         {/* ── Header ──────────────────────────────────────────── */}
         <View className="px-xl pt-3 pb-[14px] gap-3">

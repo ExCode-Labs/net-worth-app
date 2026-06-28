@@ -99,7 +99,7 @@ export default function AddScreen() {
     <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-cosmic-darker">
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
         <ScrollView

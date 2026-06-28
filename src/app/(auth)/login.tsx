@@ -282,7 +282,7 @@ export default function LoginScreen() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-cosmic-darker">
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView
           contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, paddingBottom: 32 }}
           showsVerticalScrollIndicator={false}
