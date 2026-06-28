@@ -62,10 +62,15 @@ type LoadingKey = "email" | "google" | "guest" | "otp" | "forgot" | "reset" | nu
 
 const API_UNREACHABLE =
   "Can't reach the server. Check EXPO_PUBLIC_API_URL in .env matches your PC's LAN IP.";
+const API_TIMEOUT =
+  "The server took too long to respond. Please try again.";
 
 function errMsg(e: unknown): string {
   if (e instanceof Error) {
-    if (/network|timeout|fetch/i.test(e.message)) return API_UNREACHABLE;
+    // A timeout is transient (often a cold backend) — tell the user to retry
+    // rather than blaming their config.
+    if (/timeout|aborted|ECONNABORTED/i.test(e.message)) return API_TIMEOUT;
+    if (/network|fetch/i.test(e.message)) return API_UNREACHABLE;
     return e.message;
   }
   return "Something went wrong. Try again.";

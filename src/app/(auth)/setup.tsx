@@ -31,19 +31,31 @@ import { useAccountStore } from "@/store/accountStore";
 import { pushAllLocal } from "@/services/sync";
 import { toast } from "@/store/toastStore";
 import CurrencyStep from "@/components/onboarding/CurrencyStep";
-import AccountStep  from "@/components/onboarding/AccountStep";
-import AssetForm, { EMPTY_ASSET_DRAFT, buildAsset } from "@/components/assets/AssetForm";
-import SuccessStep  from "@/components/onboarding/SuccessStep";
+import AccountStep from "@/components/onboarding/AccountStep";
+import AssetForm, {
+  EMPTY_ASSET_DRAFT,
+  buildAsset,
+} from "@/components/assets/AssetForm";
+import SuccessStep from "@/components/onboarding/SuccessStep";
 import { Button } from "@/components/ui/Button";
 
 const TOTAL = 4;
 
 // ── Animated dot ──────────────────────────────────────────────────────────────
-const StepDot = memo(function StepDot({ index, currentStep }: { index: number; currentStep: number }) {
+const StepDot = memo(function StepDot({
+  index,
+  currentStep,
+}: {
+  index: number;
+  currentStep: number;
+}) {
   const w = useSharedValue(index === 0 ? 22 : 8);
 
   useEffect(() => {
-    w.value = withSpring(index + 1 === currentStep ? 22 : 8, { damping: 18, stiffness: 220 });
+    w.value = withSpring(index + 1 === currentStep ? 22 : 8, {
+      damping: 18,
+      stiffness: 220,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep]);
 
@@ -64,7 +76,7 @@ const StepDot = memo(function StepDot({ index, currentStep }: { index: number; c
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 export default function SetupScreen() {
-  const [step, setStep]           = useState(1);
+  const [step, setStep] = useState(1);
   const [direction, setDirection] = useState<1 | -1>(1);
   const [isLoading, setIsLoading] = useState(false);
   const [guestName, setGuestName] = useState("");
@@ -76,8 +88,8 @@ export default function SetupScreen() {
   // Phone: the library manages the national-number portion (`phone`) and the
   // selected country separately. We store the full international number
   // (calling code + national) so contact discovery can normalize it server-side.
-  const [phone, setPhoneLocal]           = useState(savedPhone ?? "");
-  const [country, setCountry]            = useState<ICountry | null>(null);
+  const [phone, setPhoneLocal] = useState(savedPhone ?? "");
+  const [country, setCountry] = useState<ICountry | null>(null);
   const phoneValid = !!country && isValidPhoneNumber(phone, country);
   // Calling code = idd.root (+ the lone suffix where a country has exactly one).
   const callingCode = country
@@ -86,13 +98,21 @@ export default function SetupScreen() {
   const fullPhone = country ? `${callingCode} ${phone}`.trim() : phone.trim();
 
   const [currency, setCurrency] = useState("INR");
-  const [account, setAccount]   = useState({ type: "bank", bank: "", nickname: "", accountNumber: "", ifsc: "", branch: "", balance: "" });
-  const [asset, setAsset]       = useState(EMPTY_ASSET_DRAFT);
-  const builtAsset              = buildAsset(asset);
+  const [account, setAccount] = useState({
+    type: "bank",
+    bank: "",
+    nickname: "",
+    accountNumber: "",
+    ifsc: "",
+    branch: "",
+    balance: "",
+  });
+  const [asset, setAsset] = useState(EMPTY_ASSET_DRAFT);
+  const builtAsset = buildAsset(asset);
 
   // ── Progress bar ─────────────────────────────────────────────────────────
   const trackWidth = useRef(0);
-  const fillPx     = useSharedValue(0);
+  const fillPx = useSharedValue(0);
 
   const onTrackLayout = (e: LayoutChangeEvent) => {
     trackWidth.current = e.nativeEvent.layout.width;
@@ -147,21 +167,28 @@ export default function SetupScreen() {
       saveCurrency(currency);
       if (account.bank.trim() && account.balance.trim()) {
         addAccount({
-          type:          account.type,
-          bank:          account.bank.trim(),
-          nickname:      account.nickname.trim() || account.bank.trim(),
-          accountName:   account.nickname.trim() || undefined,
+          type: account.type,
+          bank: account.bank.trim(),
+          nickname: account.nickname.trim() || account.bank.trim(),
+          accountName: account.nickname.trim() || undefined,
           accountNumber: account.accountNumber.trim() || undefined,
-          ifsc:          account.ifsc.trim() || undefined,
-          branch:        account.branch.trim() || undefined,
-          balance:       parseFloat(account.balance) || 0,
+          ifsc: account.ifsc.trim() || undefined,
+          branch: account.branch.trim() || undefined,
+          balance: parseFloat(account.balance) || 0,
         });
       }
       if (builtAsset.valid) {
-        addAsset({ type: asset.type, name: builtAsset.name, value: builtAsset.value, details: builtAsset.details, startDate: builtAsset.startDate, periodMonths: builtAsset.periodMonths });
+        addAsset({
+          type: asset.type,
+          name: builtAsset.name,
+          value: builtAsset.value,
+          details: builtAsset.details,
+          startDate: builtAsset.startDate,
+          periodMonths: builtAsset.periodMonths,
+        });
       }
-      pushAllLocal();              // flush all entered data to the backend
-      await completeOnboarding();  // marks user onboarded (local + server)
+      pushAllLocal(); // flush all entered data to the backend
+      await completeOnboarding(); // marks user onboarded (local + server)
       toast.success("All set! Your dashboard is ready.");
       router.replace("/(tabs)");
     }
@@ -169,31 +196,39 @@ export default function SetupScreen() {
   };
 
   const handleBack = () => {
-    if (step > 1) { setDirection(-1); setStep((s) => s - 1); }
+    if (step > 1) {
+      setDirection(-1);
+      setStep((s) => s - 1);
+    }
   };
 
   // Skip current step only → advance to next
   const handleSkipStep = () => {
-    if (step === 1 && !commitStep1()) return;   // phone is mandatory
+    if (step === 1 && !commitStep1()) return; // phone is mandatory
     setDirection(1);
     if (step < TOTAL) setStep((s) => s + 1);
   };
 
   // Skip ALL remaining steps → go straight to dashboard
   const handleSkipAll = async () => {
-    if (step === 1 && !commitStep1()) return;   // phone is mandatory
+    if (step === 1 && !commitStep1()) return; // phone is mandatory
     // Save whatever has been filled so far
     setCurrency(currency);
     if (account.bank.trim() && account.balance.trim()) {
       addAccount({
-        type:     account.type,
-        bank:     account.bank.trim(),
+        type: account.type,
+        bank: account.bank.trim(),
         nickname: account.nickname.trim() || account.bank.trim(),
-        balance:  parseFloat(account.balance) || 0,
+        balance: parseFloat(account.balance) || 0,
       });
     }
     if (builtAsset.valid) {
-      addAsset({ type: asset.type, name: builtAsset.name, value: builtAsset.value, details: builtAsset.details });
+      addAsset({
+        type: asset.type,
+        name: builtAsset.name,
+        value: builtAsset.value,
+        details: builtAsset.details,
+      });
     }
     pushAllLocal();
     await completeOnboarding();
@@ -201,9 +236,11 @@ export default function SetupScreen() {
   };
 
   const skipStepLabel =
-    step === 1 ? "Set currency later" :
-    step === 2 ? "Add account later"  :
-                 "Add assets later";
+    step === 1
+      ? "Set currency later"
+      : step === 2
+        ? "Add account later"
+        : "Add assets later";
 
   // ── Step content ──────────────────────────────────────────────────────────
   const renderStep = () => {
@@ -224,6 +261,8 @@ export default function SetupScreen() {
                 placeholder="98765 43210"
                 phoneInputPlaceholderTextColor="#374151"
                 modalType="bottomSheet"
+                initialBottomsheetHeight="75%"
+                maxBottomsheetHeight="90%"
                 theme="dark"
                 phoneInputStyles={{
                   container: {
@@ -232,13 +271,18 @@ export default function SetupScreen() {
                     borderColor: "rgba(255,255,255,0.10)",
                     borderRadius: 12,
                   },
-                  flagContainer: { backgroundColor: "transparent", borderTopLeftRadius: 12, borderBottomLeftRadius: 12 },
+                  flagContainer: {
+                    backgroundColor: "transparent",
+                    borderTopLeftRadius: 12,
+                    borderBottomLeftRadius: 12,
+                  },
                   callingCode: { color: "#fff" },
                   input: { color: "#fff" },
                 }}
               />
               <Text className="text-[11px] text-dim">
-                Required — lets friends find you to share balances & more. Never shown publicly.
+                Required — lets friends find you to share balances & more. Never
+                shown publicly.
               </Text>
             </View>
             <CurrencyStep
@@ -249,13 +293,18 @@ export default function SetupScreen() {
             />
           </>
         );
-      case 2: return <AccountStep account={account} onAccountChange={setAccount} />;
+      case 2:
+        return <AccountStep account={account} onAccountChange={setAccount} />;
       case 3:
         return (
           <View className="gap-[22px]">
             <View className="gap-1">
-              <Text className="text-[26px] font-extrabold text-white">Add Your First Asset</Text>
-              <Text className="text-base text-muted">Start tracking your investments &amp; wealth</Text>
+              <Text className="text-[26px] font-extrabold text-white">
+                Add Your First Asset
+              </Text>
+              <Text className="text-base text-muted">
+                Start tracking your investments &amp; wealth
+              </Text>
             </View>
             <AssetForm draft={asset} onChange={setAsset} />
           </View>
@@ -264,15 +313,25 @@ export default function SetupScreen() {
         return (
           <SuccessStep
             currency={currency}
-            account={{ type: account.type, bank: account.bank, balance: account.balance }}
-            asset={{ type: asset.type, name: builtAsset.name, value: String(builtAsset.value) }}
+            account={{
+              type: account.type,
+              bank: account.bank,
+              balance: account.balance,
+            }}
+            asset={{
+              type: asset.type,
+              name: builtAsset.name,
+              value: String(builtAsset.value),
+            }}
           />
         );
-      default: return null;
+      default:
+        return null;
     }
   };
 
-  const nextLabel = step === 1 ? "Set Currency" : step === 4 ? "Go to Dashboard" : "Continue";
+  const nextLabel =
+    step === 1 ? "Set Currency" : step === 4 ? "Go to Dashboard" : "Continue";
 
   return (
     <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-cosmic-darker">
@@ -306,8 +365,16 @@ export default function SetupScreen() {
             </View>
 
             {step < TOTAL ? (
-              <TouchableOpacity onPress={handleSkipAll} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text className="text-sm text-accent-purple font-semibold" style={{ width: 46, textAlign: "right" }}>Skip all</Text>
+              <TouchableOpacity
+                onPress={handleSkipAll}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text
+                  className="text-sm text-accent-purple font-semibold"
+                  style={{ width: 46, textAlign: "right" }}
+                >
+                  Skip all
+                </Text>
               </TouchableOpacity>
             ) : (
               <View style={{ width: 46 }} />
@@ -321,7 +388,10 @@ export default function SetupScreen() {
             onLayout={onTrackLayout}
           >
             <Animated.View
-              style={[fillStyle, { height: 3, backgroundColor: "#a855f7", borderRadius: 2 }]}
+              style={[
+                fillStyle,
+                { height: 3, backgroundColor: "#a855f7", borderRadius: 2 },
+              ]}
             />
           </View>
         </View>
@@ -348,8 +418,11 @@ export default function SetupScreen() {
         {/* ── Bottom bar: dots + CTA ───────────────────────────── */}
         <Animated.View
           entering={FadeIn.duration(400)}
-          className="px-xl pt-3 pb-2 gap-[10px]"
-          style={{ borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.06)" }}
+          className="px-xl pt-3 pb-2 gap-[10px] mt-auto"
+          style={{
+            borderTopWidth: 1,
+            borderTopColor: "rgba(255,255,255,0.06)",
+          }}
         >
           {/* Dots centered */}
           <View className="flex-row gap-1.5 items-center justify-center mb-0.5">
@@ -365,8 +438,13 @@ export default function SetupScreen() {
           />
 
           {step < TOTAL && (
-            <TouchableOpacity onPress={handleSkipStep} className="items-center py-2">
-              <Text className="text-sm text-dim font-semibold">{skipStepLabel}</Text>
+            <TouchableOpacity
+              onPress={handleSkipStep}
+              className="items-center py-2"
+            >
+              <Text className="text-sm text-dim font-semibold">
+                {skipStepLabel}
+              </Text>
             </TouchableOpacity>
           )}
         </Animated.View>

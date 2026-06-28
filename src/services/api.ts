@@ -11,7 +11,10 @@ function getAuthStore() {
   return require("@/store/authStore").useAuthStore as typeof import("@/store/authStore").useAuthStore;
 }
 
-const client = create({ baseURL: API_BASE, timeout: 15000 });
+// 30s: a cold serverless backend (Neon wake + first Redis TLS connect) can take
+// well over 15s on the first request, which otherwise surfaces as a misleading
+// "check your API URL" timeout error on the very first auth call.
+const client = create({ baseURL: API_BASE, timeout: 30000 });
 
 // ── Request: inject auth headers ──────────────────────────────────────────────
 
