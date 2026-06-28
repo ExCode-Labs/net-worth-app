@@ -75,7 +75,7 @@ export default function BankPicker({ value, onSelect, placeholder }: Props) {
         <Ionicons name="chevron-down" size={18} color={C.textMuted} />
       </TouchableOpacity>
 
-      <BottomSheetModal ref={ref} snapPoints={SNAP} onDismiss={() => setQuery("")}
+      <BottomSheetModal ref={ref} snapPoints={SNAP} enableDynamicSizing={false} onDismiss={() => setQuery("")}
         backdropComponent={renderBackdrop}
         keyboardBehavior="interactive" keyboardBlurBehavior="restore"
         android_keyboardInputMode="adjustResize"

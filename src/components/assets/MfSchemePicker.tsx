@@ -79,7 +79,7 @@ export default function MfSchemePicker({ value, onSelect }: Props) {
         <Ionicons name="search" size={18} color={C.textMuted} />
       </TouchableOpacity>
 
-      <BottomSheetModal ref={ref} snapPoints={SNAP} onDismiss={() => { setQuery(""); setResults([]); }}
+      <BottomSheetModal ref={ref} snapPoints={SNAP} enableDynamicSizing={false} onDismiss={() => { setQuery(""); setResults([]); }}
         backdropComponent={renderBackdrop}
         keyboardBehavior="interactive" keyboardBlurBehavior="restore"
         android_keyboardInputMode="adjustResize"

@@ -95,7 +95,11 @@ export default function AddCardScreen() {
   const [cardName, setCardName]     = useState(existing?.cardName ?? "");
   const [bank, setBank]             = useState(existing?.bank ?? prefillBank ?? "");
   const [billCycle, setBillCycle]   = useState(existing?.billCycle ?? "");
-  const [number, setNumber]         = useState(groupCardNumber(existing?.number ?? prefillLast4 ?? ""));
+  // Don't seed the number field with the known last-4 — it would render as the
+  // FIRST 4 digits and, once the user types a full PAN, corrupt the stored
+  // last-4 so the card no longer matches its transactions. We keep last-4
+  // separately (prefillLast4) and fall back to it on save instead.
+  const [number, setNumber]         = useState(groupCardNumber(existing?.number ?? ""));
   const [cardHolder, setCardHolder] = useState(existing?.cardHolder ?? fullName);
   const [network, setNetwork]       = useState(existing?.network ?? "");
   const [expiry, setExpiry]         = useState(existing?.expiry ?? "");
@@ -129,6 +133,10 @@ export default function AddCardScreen() {
 
     setSaving(true);
     const digits = number.replace(/\D/g, "");
+    // Prefer the last-4 of a full PAN; otherwise use the last-4 we already know
+    // from the transaction we're linking (prefillLast4). This keeps the card
+    // matchable to its notification transactions even with no PAN entered.
+    const last4 = digits.slice(-4) || (prefillLast4 ?? "");
     const payload = {
       cardName:   cardName.trim(),
       bank:       bank.trim(),
@@ -136,7 +144,7 @@ export default function AddCardScreen() {
       number:     digits || undefined,
       cardHolder: cardHolder.trim() || undefined,
       network:    network.trim() || undefined,
-      last4:      digits.slice(-4),
+      last4,
       expiry:     expiry.trim(),
       limit:      parseFloat(limit) || 0,
     };
@@ -226,7 +234,7 @@ export default function AddCardScreen() {
             </View>
 
             <LabeledInput f={{ label: "Bill Cycle Date", value: billCycle, set: setBillDay, placeholder: "e.g., 22", keyboardType: "number-pad", maxLength: 2, hint: "Statement day of the month (1–31)." }} />
-            <LabeledInput f={{ label: "Card Number", value: number, set: setNumberFmt, placeholder: "1234 5678 9012 3456", keyboardType: "number-pad", maxLength: 19, hint: "Network is detected automatically. Stored securely, shown only on your vault page." }} />
+            <LabeledInput f={{ label: "Card Number", value: number, set: setNumberFmt, placeholder: "1234 5678 9012 3456", keyboardType: "number-pad", maxLength: 19, hint: prefillLast4 ? `Linking transactions from the card ending ${prefillLast4}. Enter the full number, or leave blank to keep just the last 4.` : "Network is detected automatically. Stored securely, shown only on your vault page." }} />
 
             <LabeledInput f={{ label: "Card Holder", value: cardHolder, set: setCardHolder, placeholder: "Name on card" }} />
 
