@@ -44,7 +44,7 @@ export default function AddAssetScreen() {
       updateAsset(existing.id, payload);
       toast.success("Asset updated.");
     } else {
-      addAsset(payload);
+      await addAsset(payload);
       toast.success("Asset added.");
     }
     setSaving(false);

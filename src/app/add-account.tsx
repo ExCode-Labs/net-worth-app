@@ -21,6 +21,7 @@ import { useAccountStore } from "@/store/accountStore";
 import { replayForNewAccount } from "@/services/bankIngest";
 import { toast } from "@/store/toastStore";
 import { confirm } from "@/store/confirmStore";
+import { apiError } from "@/utils/apiError";
 
 const EMPTY: AccountForm = {
   type: "bank",
@@ -79,11 +80,15 @@ export default function AddAccountScreen() {
       updateAccount(existing.id, payload);
       toast.success("Account updated.");
     } else {
-      addAccount(payload);
-      // replay any notification txns that arrived before this account was added
-      const added = useAccountStore.getState().accounts.at(-1)!;
-      replayForNewAccount(added);
-      toast.success("Account added.");
+      try {
+        const added = await addAccount(payload);
+        replayForNewAccount(added);
+        toast.success("Account added.");
+      } catch (e) {
+        toast.error(apiError(e, "Failed to save account. Please try again."));
+        setSaving(false);
+        return;
+      }
     }
     setSaving(false);
     router.back();

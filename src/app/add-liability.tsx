@@ -84,7 +84,7 @@ export default function AddLiabilityScreen() {
       updateLiability(existing.id, payload);
       toast.success("Liability updated.");
     } else {
-      addLiability(payload);
+      await addLiability(payload);
       toast.success("Liability added.");
     }
     setSaving(false);

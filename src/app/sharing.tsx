@@ -18,6 +18,7 @@ import {
   type IncomingShare,
 } from "@/services/sharing";
 import { toast } from "@/store/toastStore";
+import { apiError } from "@/utils/apiError";
 import CategorySheet from "@/components/sharing/CategorySheet";
 
 const catLabel = (key: string) => SHARE_CATEGORIES.find((c) => c.key === key)?.label ?? key;
@@ -64,8 +65,8 @@ export default function SharingScreen() {
       toast.success(categories.length ? "Sharing updated." : "Sharing stopped.");
       setEdit(null);
       await load();
-    } catch {
-      toast.error("Couldn't update sharing.");
+    } catch (e) {
+      toast.error(apiError(e, "Couldn't update sharing."));
     } finally {
       setSaving(false);
     }

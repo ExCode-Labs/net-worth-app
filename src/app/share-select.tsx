@@ -14,6 +14,7 @@ import {
   type AppUser,
 } from "@/services/sharing";
 import { toast } from "@/store/toastStore";
+import { apiError } from "@/utils/apiError";
 import CategorySheet from "@/components/sharing/CategorySheet";
 
 type Status = "loading" | "ok" | "denied" | "unavailable";
@@ -33,8 +34,8 @@ export default function ShareSelectScreen() {
       if (res.status === "unavailable") { setStatus("unavailable"); return; }
       setUsers(res.users);
       setStatus("ok");
-    } catch {
-      toast.error("Couldn't search contacts.");
+    } catch (e) {
+      toast.error(apiError(e, "Couldn't search contacts."));
       setStatus("ok");
     }
   }, []);
@@ -50,8 +51,8 @@ export default function ShareSelectScreen() {
       toast.success(`Sharing with ${pick.contactName || pick.name}.`);
       setPick(null);
       router.back();
-    } catch {
-      toast.error("Couldn't start sharing.");
+    } catch (e) {
+      toast.error(apiError(e, "Couldn't start sharing."));
     } finally {
       setSaving(false);
     }

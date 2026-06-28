@@ -7,7 +7,6 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { pushCreate, pushUpdate, pushRemove } from "@/services/backend";
-import { uid } from "@/utils/id";
 import type { LedgerRefs } from "@/store/accountStore";
 
 export interface Liability {
@@ -28,7 +27,7 @@ export interface Liability {
 interface LiabilityStore {
   liabilities: Liability[];
 
-  addLiability:    (l: Omit<Liability, "id">) => void;
+  addLiability:    (l: Omit<Liability, "id">) => Promise<Liability>;
   updateLiability: (id: string, updates: Partial<Omit<Liability, "id">>) => void;
   removeLiability: (id: string) => void;
   reset:           () => void;
@@ -39,10 +38,11 @@ export const useLiabilityStore = create<LiabilityStore>()(
     (set) => ({
       liabilities: [],
 
-      addLiability: (l) => {
-        const liability = { ...l, id: uid() };
+      addLiability: async (l) => {
+        const { id } = await pushCreate("liabilities", l);
+        const liability = { ...l, id };
         set((s) => ({ liabilities: [...s.liabilities, liability] }));
-        pushCreate("liabilities", liability);
+        return liability;
       },
 
       updateLiability: (id, updates) => {

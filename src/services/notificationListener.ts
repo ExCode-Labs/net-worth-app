@@ -89,13 +89,21 @@ function listenerComponentName(): string | null {
  *   • Older Android / any failure: fall back to the generic listener list.
  *
  * User-initiated only — call from a button, never automatically on launch.
+ * Works via IntentLauncher regardless of whether the native module is available.
  */
 export function requestNotificationAccess(): void {
-  if (!notificationListenerAvailable || !native) return;
+  if (Platform.OS !== "android") return;
 
   const component = listenerComponentName();
-  // Platform.Version is the API level (number) on Android.
   const apiLevel = typeof Platform.Version === "number" ? Platform.Version : 0;
+
+  const openGeneric = () =>
+    IntentLauncher.startActivityAsync(
+      "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS",
+    ).catch(() => {
+      // Last resort: use native module if available.
+      native?.requestPermission();
+    });
 
   if (component && apiLevel >= 30) {
     IntentLauncher.startActivityAsync(
@@ -105,14 +113,11 @@ export function requestNotificationAccess(): void {
           "android.provider.extra.NOTIFICATION_LISTENER_COMPONENT_NAME": component,
         },
       },
-    ).catch(() => {
-      // OEMs that don't honour the detail action → generic list.
-      native?.requestPermission();
-    });
+    ).catch(openGeneric);
     return;
   }
 
-  native.requestPermission();
+  openGeneric();
 }
 
 /**

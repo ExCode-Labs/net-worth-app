@@ -81,6 +81,7 @@ function RouteGate() {
     isBootstrapped,
     notifGateRequired,
     notifAccess,
+    batteryOptimDone,
   } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
@@ -101,7 +102,9 @@ function RouteGate() {
     if (!isHydrated) return;
     if (authed && !isBootstrapped) return;
 
-    const needsNotifAccess = notifGateRequired && notifAccess !== "authorized";
+    // Require both notification access and battery optimization confirmation.
+    const needsPermissions = notifGateRequired &&
+      (notifAccess !== "authorized" || !batteryOptimDone);
 
     if (!authed) {
       if (!hasSeenWelcome) {
@@ -110,7 +113,7 @@ function RouteGate() {
         if (subRoute !== "login") router.replace("/(auth)/login");
       }
     } else if (!hasOnboarded) {
-      if (needsNotifAccess) {
+      if (needsPermissions) {
         if (subRoute !== "permissions") router.replace("/(auth)/permissions");
       } else if (subRoute !== "setup") {
         router.replace("/(auth)/setup");
@@ -128,6 +131,7 @@ function RouteGate() {
     isBootstrapped,
     notifGateRequired,
     notifAccess,
+    batteryOptimDone,
     segments,
   ]);
 

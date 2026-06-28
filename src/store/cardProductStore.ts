@@ -30,6 +30,7 @@ export const useCardProductStore = create<CardProductStore>()(
                 issuer: c.issuer,
                 network: c.network,
                 type: c.type,
+                cardType: (c as unknown as { cardType?: "credit" | "debit" }).cardType ?? "credit",
               })),
             });
           }

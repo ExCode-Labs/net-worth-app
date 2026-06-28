@@ -44,6 +44,7 @@ import {
 } from "@react-native-google-signin/google-signin";
 import { useAuthStore } from "@/store/authStore";
 import { toast } from "@/store/toastStore";
+import { apiError } from "@/utils/apiError";
 import {
   emailLogin,
   emailRegister,
@@ -60,21 +61,6 @@ type Stage = "auth" | "otp" | "forgot" | "reset";
 type AuthTab = "signin" | "signup";
 type LoadingKey = "email" | "google" | "guest" | "otp" | "forgot" | "reset" | null;
 
-const API_UNREACHABLE =
-  "Can't reach the server. Check EXPO_PUBLIC_API_URL in .env matches your PC's LAN IP.";
-const API_TIMEOUT =
-  "The server took too long to respond. Please try again.";
-
-function errMsg(e: unknown): string {
-  if (e instanceof Error) {
-    // A timeout is transient (often a cold backend) — tell the user to retry
-    // rather than blaming their config.
-    if (/timeout|aborted|ECONNABORTED/i.test(e.message)) return API_TIMEOUT;
-    if (/network|fetch/i.test(e.message)) return API_UNREACHABLE;
-    return e.message;
-  }
-  return "Something went wrong. Try again.";
-}
 
 GoogleSignin.configure({
   webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
@@ -159,7 +145,7 @@ export default function LoginScreen() {
       setStage("otp");
       toast.success("Code sent — check your email.");
     } catch (e) {
-      toast.error(errMsg(e));
+      toast.error(apiError(e));
     } finally {
       setLoading(null);
     }
@@ -181,7 +167,7 @@ export default function LoginScreen() {
       setStage("otp");
       toast.success("Account created! Check your email for the verification code.");
     } catch (e) {
-      toast.error(errMsg(e));
+      toast.error(apiError(e));
     } finally {
       setLoading(null);
     }
@@ -196,7 +182,7 @@ export default function LoginScreen() {
       const result = await verifyEmailOtp(pendingEmail, otp);
       await finishLogin(result);
     } catch (e) {
-      toast.error(errMsg(e));
+      toast.error(apiError(e));
     } finally {
       setLoading(null);
     }
@@ -208,7 +194,7 @@ export default function LoginScreen() {
       await resendOtp(pendingEmail);
       toast.success("New code sent.");
     } catch (e) {
-      toast.error(errMsg(e));
+      toast.error(apiError(e));
     }
   };
 
@@ -226,7 +212,7 @@ export default function LoginScreen() {
       setStage("reset");
       toast.success("If that email is registered, a reset code has been sent.");
     } catch (e) {
-      toast.error(errMsg(e));
+      toast.error(apiError(e));
     } finally {
       setLoading(null);
     }
@@ -243,7 +229,7 @@ export default function LoginScreen() {
       await finishLogin(result);
       toast.success("Password updated! You're now signed in.");
     } catch (e) {
-      toast.error(errMsg(e));
+      toast.error(apiError(e));
     } finally {
       setLoading(null);
     }
@@ -261,7 +247,7 @@ export default function LoginScreen() {
       await finishLogin(result);
     } catch (e: unknown) {
       if (e && typeof e === "object" && "code" in e && e.code === statusCodes.SIGN_IN_CANCELLED) return;
-      toast.error(errMsg(e));
+      toast.error(apiError(e));
     } finally {
       setLoading(null);
     }

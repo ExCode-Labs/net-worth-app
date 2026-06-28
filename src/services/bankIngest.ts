@@ -70,22 +70,45 @@ export function ingestBankMessage(raw: string, receivedAtMs?: number, sender?: s
   const parsed = parseBankMessage(raw, receivedAtMs, sender);
   if (!parsed) return "skipped";
 
-  // Link to a stored account by bank+last4, falling back to last-4 alone (see
-  // findMatchingAccount) — the account-number-only fallback.
-  const account = findMatchingAccount(
-    useAccountStore.getState().accounts,
+  const { accounts } = useAccountStore.getState();
+
+  // Primary match: bank account whose bank + last-4 match the message.
+  const account = findMatchingAccount(accounts, parsed.bank, parsed.accountLast4);
+  if (account) {
+    useTransactionStore.getState().addTransaction(toTransaction(parsed));
+    useAccountStore.getState().updateAccount(account.id, { balance: nextBalance(account, parsed) });
+    return "applied";
+  }
+
+  // Debit card match (e.g. "HDFC Bank Card x2207") — must be checked BEFORE
+  // recording the transaction so it's stored as a card txn, not a bank txn.
+  const cards = useCardStore.getState().cards;
+  const debitCard = findMatchingCard(
+    cards.filter((c) => c.type === "debit"),
     parsed.bank,
     parsed.accountLast4,
   );
-
-  useTransactionStore.getState().addTransaction(toTransaction(parsed));
-
-  if (account) {
-    useAccountStore.getState().updateAccount(account.id, {
-      balance: nextBalance(account, parsed),
-    });
-    return "applied";
+  if (debitCard) {
+    // Record under the card, not the account — account field format drives the UI.
+    // Stamp cardId so future replayForNewCard doesn't double-count this txn.
+    const txn = {
+      ...toTransaction(parsed),
+      account: `Card ••${parsed.accountLast4 || debitCard.last4}`,
+      cardId: debitCard.id,
+    };
+    useTransactionStore.getState().addTransaction(txn);
+    if (debitCard.linkedAccountId) {
+      const linked = accounts.find((a) => a.id === debitCard.linkedAccountId);
+      if (linked) {
+        useAccountStore.getState().updateAccount(linked.id, { balance: nextBalance(linked, parsed) });
+        return "applied";
+      }
+    }
+    return "recorded";
   }
+
+  // No match — log the transaction without touching any balance.
+  useTransactionStore.getState().addTransaction(toTransaction(parsed));
   return "recorded";
 }
 
@@ -165,7 +188,10 @@ export function replayForNewAccount(account: Account): void {
 
 /**
  * Called after a new card is saved. Finds all unlinked notification
- * transactions that match this card and adds their net spend to usage.
+ * transactions that match this card by bank + last-4.
+ *   • Credit card: adds net spend to card.usage.
+ *   • Debit card: adds net delta to the linked account balance (the card
+ *     itself carries no balance — the underlying account does).
  * Also stamps each matched transaction with cardId so future replays
  * don't double-count them.
  */
@@ -173,18 +199,33 @@ export function replayForNewCard(card: Card): void {
   const { transactions, updateTransaction } = useTransactionStore.getState();
   const last4 = (t: Transaction) => t.account.replace(/\D/g, "").slice(-4);
   const matched = transactions.filter(
-    // !t.cardId: skip transactions already linked to a card (this or another)
     (t) => t.source === "notification" && !t.cardId && !t.accountId &&
       findMatchingCard([card], t.bank, last4(t)),
   );
   if (!matched.length) return;
-  const net = matched.reduce(
-    (sum, t) => sum + (t.type === "Expense" ? t.amount : -t.amount),
-    0,
-  );
-  useCardStore.getState().updateCard(card.id, {
-    usage: Math.max(0, card.usage + net),
-  });
+
+  if (card.type === "debit" && card.linkedAccountId) {
+    // Update linked account balance instead of card usage.
+    const linked = useAccountStore.getState().accounts.find((a) => a.id === card.linkedAccountId);
+    if (linked) {
+      const net = matched.reduce(
+        (sum, t) => sum + (t.type === "Income" ? t.amount : -t.amount),
+        0,
+      );
+      useAccountStore.getState().updateAccount(linked.id, {
+        balance: linked.balance + net,
+      });
+    }
+  } else {
+    const net = matched.reduce(
+      (sum, t) => sum + (t.type === "Expense" ? t.amount : -t.amount),
+      0,
+    );
+    useCardStore.getState().updateCard(card.id, {
+      usage: Math.max(0, card.usage + net),
+    });
+  }
+
   matched.forEach((t) => updateTransaction(t.id, { cardId: card.id }));
 }
 

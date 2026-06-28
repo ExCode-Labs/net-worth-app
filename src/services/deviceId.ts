@@ -1,18 +1,15 @@
 /**
- * Device identity — used to restore a *guest's* data when they reinstall the app
- * on the same device (no account, so we key their server-side snapshot on the
- * device instead of a user id).
+ * Device identity sent with every unauthenticated request (guests + registration).
  *
  * Two ids:
  *   • hardwareId — Android SSAID (`Settings.Secure.ANDROID_ID`). Stable across
- *     uninstall/reinstall on the same device + app signing key, so it's the
- *     durable key the backend uses to find a returning guest. Android-only.
- *   • deviceId   — a UUID we generate once and keep in SecureStore. Usually
- *     cleared on uninstall, so it is NOT reliable for reinstall restore on its
- *     own; it's a stable session/local id and the fallback when SSAID is absent
- *     (iOS / web).
+ *     uninstall/reinstall on the same device + app signing key. Android-only.
+ *   • deviceId   — a UUID we generate once and keep in SecureStore. Cleared on
+ *     uninstall; used as the stable key on iOS / web.
  *
- * The backend keys a guest on hardwareId when present, else deviceId.
+ * The backend uses hardwareId when present, else deviceId:
+ *   - Guests: deviceKey IS their identity (upsert by key).
+ *   - Auth users: deviceKey is stored once at account creation (informational).
  */
 import { Platform } from "react-native";
 
@@ -87,16 +84,19 @@ export async function getDeviceId(): Promise<string> {
   return id;
 }
 
-export interface GuestIdentity {
-  /** Durable key for reinstall restore: SSAID if available, else the local UUID. */
-  guestKey:   string;
+export interface DeviceIdentity {
+  /** Durable key sent as X-Device-Key: SSAID if available, else the local UUID. */
+  deviceKey:  string;
   deviceId:   string;
   hardwareId: string | null;
 }
 
-/** Resolve the identity sent to the backend for a guest session. */
-export async function getGuestIdentity(): Promise<GuestIdentity> {
+/** Resolve the device identity sent to the backend on unauthenticated requests. */
+export async function getDeviceIdentity(): Promise<DeviceIdentity> {
   const deviceId   = await getDeviceId();
   const hardwareId = getHardwareId();
-  return { guestKey: hardwareId ?? deviceId, deviceId, hardwareId };
+  return { deviceKey: hardwareId ?? deviceId, deviceId, hardwareId };
 }
+
+/** @deprecated use getDeviceIdentity() */
+export const getGuestIdentity = getDeviceIdentity;

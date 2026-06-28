@@ -6,7 +6,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { pushCreate, pushUpdate, pushRemove } from "@/services/backend";
+import { syncCreate, pushUpdate, pushRemove } from "@/services/backend";
 import { useAccountStore } from "@/store/accountStore";
 import { uid } from "@/utils/id";
 
@@ -80,7 +80,7 @@ export const useTransactionStore = create<TransactionStore>()(
       addTransaction: (t) => {
         const tx = { ...t, id: uid() };
         set((s) => ({ transactions: [tx, ...s.transactions] }));
-        pushCreate("transactions", tx);
+        syncCreate("transactions", tx);
         applyTxBalance(tx, 1);
       },
 

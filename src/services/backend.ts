@@ -30,6 +30,7 @@ export interface MeDto {
   currency: string;
   guestName: string | null;
   onboarded: boolean;
+  hasVaultPin: boolean;
 }
 
 export interface Bootstrap {
@@ -52,6 +53,15 @@ export async function fetchBootstrap(): Promise<Bootstrap | null> {
   return apiGet<Bootstrap>("/bootstrap");
 }
 
+export interface VaultData {
+  cards:    { id: string; number?: string | null; cardHolder?: string | null }[];
+  accounts: { id: string; accountNumber?: string | null; ifsc?: string | null; branch?: string | null }[];
+}
+
+export async function fetchVaultData(): Promise<VaultData> {
+  return apiGet<VaultData>("/vault");
+}
+
 export async function updateMe(patch: {
   onboarded?: boolean;
   currency?: string;
@@ -70,10 +80,43 @@ export async function updateMe(patch: {
   }
 }
 
-/** Optimistic create (idempotent upsert server-side). */
-export function pushCreate(resource: Resource, entity: { id: string }) {
+/**
+ * Create an entity without a client ID — the server assigns a cuid via
+ * @default(cuid()). Returns the created entity (at minimum `{ id }`).
+ * Throws on network error so the caller can surface it.
+ */
+export async function pushCreate<T extends { id: string }>(
+  resource: Resource,
+  data: Record<string, unknown>,
+): Promise<T> {
+  if (!apiEnabled) throw new Error("Backend not configured");
+  return apiPost<T>(`/${resource}`, { data });
+}
+
+/**
+ * Fire-and-forget create with a client-supplied id (used for notification
+ * transactions which must work offline and can be retried idempotently).
+ *
+ * Calls are serialised through a queue (one at a time, 30 ms apart) so a
+ * burst of hundreds of notification-txn syncs doesn't exhaust the server's
+ * rate-limit bucket before the user's next intentional action goes through.
+ */
+const _syncQueue: Array<() => Promise<void>> = [];
+let _syncDraining = false;
+async function _drainSync() {
+  if (_syncDraining) return;
+  _syncDraining = true;
+  while (_syncQueue.length) {
+    await _syncQueue.shift()!().catch(markDirty);
+    if (_syncQueue.length) await new Promise((r) => setTimeout(r, 30));
+  }
+  _syncDraining = false;
+}
+
+export function syncCreate(resource: Resource, entity: { id: string }) {
   if (!apiEnabled) return;
-  apiPost(`/${resource}`, { id: entity.id, data: entity }).catch(markDirty);
+  _syncQueue.push(() => apiPost(`/${resource}`, { id: entity.id, data: entity }));
+  void _drainSync();
 }
 
 export function pushUpdate(resource: Resource, id: string, updates: object) {

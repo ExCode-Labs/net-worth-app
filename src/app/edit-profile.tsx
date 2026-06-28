@@ -20,6 +20,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { useUserStore } from "@/store/userStore";
 import { updateMe } from "@/services/backend";
 import { toast } from "@/store/toastStore";
+import { apiError } from "@/utils/apiError";
 
 export default function EditProfileScreen() {
   const { firstName, lastName, fullName, email, avatarUrl, phone, setProfile, setPhone } = useUserStore();
@@ -48,8 +49,8 @@ export default function EditProfileScreen() {
       });
       toast.success("Profile updated.");
       router.back();
-    } catch {
-      toast.error("Couldn't save. Check your connection and try again.");
+    } catch (e) {
+      toast.error(apiError(e, "Couldn't save. Check your connection and try again."));
     } finally {
       setSaving(false);
     }

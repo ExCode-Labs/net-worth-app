@@ -166,7 +166,7 @@ export default function SetupScreen() {
       // Persist setup data to accountStore
       saveCurrency(currency);
       if (account.bank.trim() && account.balance.trim()) {
-        addAccount({
+        await addAccount({
           type: account.type,
           bank: account.bank.trim(),
           nickname: account.nickname.trim() || account.bank.trim(),
@@ -178,7 +178,7 @@ export default function SetupScreen() {
         });
       }
       if (builtAsset.valid) {
-        addAsset({
+        await addAsset({
           type: asset.type,
           name: builtAsset.name,
           value: builtAsset.value,
@@ -215,7 +215,7 @@ export default function SetupScreen() {
     // Save whatever has been filled so far
     setCurrency(currency);
     if (account.bank.trim() && account.balance.trim()) {
-      addAccount({
+      await addAccount({
         type: account.type,
         bank: account.bank.trim(),
         nickname: account.nickname.trim() || account.bank.trim(),
@@ -223,7 +223,7 @@ export default function SetupScreen() {
       });
     }
     if (builtAsset.valid) {
-      addAsset({
+      await addAsset({
         type: asset.type,
         name: builtAsset.name,
         value: builtAsset.value,
@@ -235,12 +235,7 @@ export default function SetupScreen() {
     router.replace("/(tabs)");
   };
 
-  const skipStepLabel =
-    step === 1
-      ? "Set currency later"
-      : step === 2
-        ? "Add account later"
-        : "Add assets later";
+  const skipStepLabel = "Skip this step";
 
   // ── Step content ──────────────────────────────────────────────────────────
   const renderStep = () => {

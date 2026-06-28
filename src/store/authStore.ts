@@ -45,11 +45,12 @@ const storage = {
   },
 };
 
-const KEY_WELCOME       = "has_seen_welcome";
-const KEY_GUEST         = "guest_mode";
-const KEY_ONBOARDED     = "has_onboarded";
-const KEY_ACCESS_TOKEN  = "app_access_token";
-const KEY_REFRESH_TOKEN = "app_refresh_token";
+const KEY_WELCOME        = "has_seen_welcome";
+const KEY_GUEST          = "guest_mode";
+const KEY_ONBOARDED      = "has_onboarded";
+const KEY_ACCESS_TOKEN   = "app_access_token";
+const KEY_REFRESH_TOKEN  = "app_refresh_token";
+const KEY_BATTERY_OPTIM  = "battery_optim_done";
 
 // ── Store interface ───────────────────────────────────────────────────────────
 interface AuthState {
@@ -63,11 +64,13 @@ interface AuthState {
   refreshToken: string | null;
   isSignedIn:   boolean;
 
-  notifGateRequired: boolean;
-  notifAccess:       NotificationAccessStatus;
+  notifGateRequired:   boolean;
+  notifAccess:         NotificationAccessStatus;
+  batteryOptimDone:    boolean;
 
   hydrate:              () => Promise<void>;
   refreshNotifAccess:   () => Promise<void>;
+  setBatteryOptimDone:  () => Promise<void>;
   completeWelcome:      () => Promise<void>;
   continueAsGuest:      () => Promise<void>;
   completeOnboarding:   () => Promise<void>;
@@ -89,29 +92,37 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   notifGateRequired: notificationListenerAvailable,
   notifAccess:       "unknown",
+  batteryOptimDone:  false,
 
   refreshNotifAccess: async () => {
     const status = await getNotificationAccessStatus();
     set({ notifAccess: status });
   },
 
+  setBatteryOptimDone: async () => {
+    await storage.set(KEY_BATTERY_OPTIM, "true");
+    set({ batteryOptimDone: true });
+  },
+
   hydrate: async () => {
     try {
-      const [welcome, guest, onboarded, access, refresh] = await Promise.all([
+      const [welcome, guest, onboarded, access, refresh, battery] = await Promise.all([
         storage.get(KEY_WELCOME),
         storage.get(KEY_GUEST),
         storage.get(KEY_ONBOARDED),
         storage.get(KEY_ACCESS_TOKEN),
         storage.get(KEY_REFRESH_TOKEN),
+        storage.get(KEY_BATTERY_OPTIM),
       ]);
       set({
-        hasSeenWelcome: welcome   === "true",
-        isGuest:        guest     === "true",
-        hasOnboarded:   onboarded === "true",
-        accessToken:    access  || null,
-        refreshToken:   refresh || null,
-        isSignedIn:     !!access,
-        isHydrated:     true,
+        hasSeenWelcome:  welcome   === "true",
+        isGuest:         guest     === "true",
+        hasOnboarded:    onboarded === "true",
+        accessToken:     access  || null,
+        refreshToken:    refresh || null,
+        isSignedIn:      !!access,
+        batteryOptimDone: battery === "true",
+        isHydrated:      true,
       });
     } catch {
       set({ isHydrated: true });

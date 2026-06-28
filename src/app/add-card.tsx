@@ -1,10 +1,11 @@
 /**
- * Add Card form. Collects card name, bank, bill cycle, card number, holder,
- * network, expiry, CVV and total limit.
+ * Add Card form — credit and debit cards.
  *
- * Vault: the full card number, holder and network are saved so the card can act
- * as a secure vault entry (revealed only on the app-lock-protected vault page).
- * CVV is never collected — it's a sensitive value we don't store.
+ * Credit cards: full set of fields (bill cycle, due date, limit, PAN, holder).
+ * Debit cards: linked account required; billing/limit fields hidden.
+ *
+ * Vault: PAN and card holder are stored server-side and returned only via
+ * GET /vault after vault PIN auth. CVV is never collected.
  */
 import React, { useEffect, useState } from "react";
 import {
@@ -23,18 +24,18 @@ import { Button } from "@/components/ui/Button";
 import BankPicker from "@/components/onboarding/BankPicker";
 import CardProductPicker from "@/components/CardProductPicker";
 import { useCardStore, bankForIssuer } from "@/store/cardStore";
+import { useAccountStore, accountLast4 } from "@/store/accountStore";
 import { replayForNewCard } from "@/services/bankIngest";
 import { useUserStore } from "@/store/userStore";
 import { toast } from "@/store/toastStore";
 import { confirm } from "@/store/confirmStore";
+import { apiError } from "@/utils/apiError";
 
 const NETWORKS = ["Visa", "Mastercard", "RuPay", "Amex", "Diners Club"] as const;
 
-/** Group raw input into 4-digit blocks: "1234 5678 9012 3456" (max 16 digits). */
 const groupCardNumber = (v: string) =>
   v.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
 
-/** Detect the network from the leading digits (IIN/BIN), or null if unknown. */
 function detectNetwork(digits: string): (typeof NETWORKS)[number] | null {
   if (/^4/.test(digits)) return "Visa";
   if (/^(34|37)/.test(digits)) return "Amex";
@@ -82,9 +83,9 @@ export default function AddCardScreen() {
   const updateCard = useCardStore((s) => s.updateCard);
   const removeCard = useCardStore((s) => s.removeCard);
   const existing   = useCardStore((s) => s.cards.find((c) => c.id === id));
+  const accounts   = useAccountStore((s) => s.accounts);
   const isEdit     = !!existing;
 
-  // Prefill the holder to the user's full name (still editable).
   const { fullName: profileFullName, firstName, lastName, guestName } = useUserStore();
   const fullName =
     profileFullName ||
@@ -92,34 +93,31 @@ export default function AddCardScreen() {
     guestName ||
     "";
 
-  const [cardName, setCardName]     = useState(existing?.cardName ?? "");
-  const [bank, setBank]             = useState(existing?.bank ?? prefillBank ?? "");
-  const [billCycle, setBillCycle]   = useState(existing?.billCycle ?? "");
-  // Seed the number field with the known last-4 from the linked transaction
-  // (mirrors add-account prefilling accountNumber) so the card always carries a
-  // last-4 to match its transactions — even if the full PAN is never entered.
-  const [number, setNumber]         = useState(groupCardNumber(existing?.number ?? prefillLast4 ?? ""));
-  const [cardHolder, setCardHolder] = useState(existing?.cardHolder ?? fullName);
-  const [network, setNetwork]       = useState(existing?.network ?? "");
-  const [expiry, setExpiry]         = useState(existing?.expiry ?? "");
-  const [limit, setLimit]           = useState(existing ? String(existing.limit) : "");
+  const [cardType, setCardType]           = useState<"credit" | "debit">(existing?.type ?? "credit");
+  const [cardName, setCardName]           = useState(existing?.cardName ?? "");
+  const [bank, setBank]                   = useState(existing?.bank ?? prefillBank ?? "");
+  const [productIssuer, setProductIssuer] = useState<string>("");
+  const [billCycle, setBillCycle]         = useState(existing?.billCycle ?? "");
+  const [dueDate, setDueDate]             = useState(existing?.dueDate ?? "");
+  const [number, setNumber]               = useState(groupCardNumber(existing?.number ?? prefillLast4 ?? ""));
+  const [cardHolder, setCardHolder]       = useState(existing?.cardHolder ?? fullName);
+  const [network, setNetwork]             = useState(existing?.network ?? "");
+  const [expiry, setExpiry]               = useState(existing?.expiry ?? "");
+  const [limit, setLimit]                 = useState(existing ? String(existing.limit) : "");
+  const [linkedAccountId, setLinkedAccountId] = useState(existing?.linkedAccountId ?? "");
+  const [saving, setSaving]               = useState(false);
 
-  // The profile name may hydrate after this screen mounts (async sync), so the
-  // initial useState above can capture an empty name. Fill the holder once the
-  // name arrives — only when adding a new card and the field is still untouched.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!existing && !cardHolder && fullName) setCardHolder(fullName);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fullName]);
-  const [saving, setSaving]         = useState(false);
 
   const setExpiryFmt = (v: string) => {
     const d = v.replace(/\D/g, "").slice(0, 4);
     setExpiry(d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d);
   };
 
-  // Group the number AND auto-fill the network from its leading digits.
   const setNumberFmt = (v: string) => {
     const grouped = groupCardNumber(v);
     setNumber(grouped);
@@ -127,49 +125,63 @@ export default function AddCardScreen() {
     if (net) setNetwork(net);
   };
 
-  // Bill cycle = a day of the month (1–31).
-  const setBillDay = (v: string) => {
+  const clampDay = (v: string, set: (s: string) => void) => {
     const d = v.replace(/\D/g, "").slice(0, 2);
-    setBillCycle(d && parseInt(d, 10) > 31 ? "31" : d);
+    set(d && parseInt(d, 10) > 31 ? "31" : d);
   };
+  const setBillDay = (v: string) => clampDay(v, setBillCycle);
+  const setDueDay  = (v: string) => clampDay(v, setDueDate);
 
   const handleSave = async () => {
     if (!cardName.trim()) { toast.error("Please enter a card name."); return; }
     if (!bank.trim())     { toast.error("Please enter the card's bank."); return; }
     if (!network.trim())  { toast.error("Please select the card network."); return; }
-    if (!limit.trim())    { toast.error("Please enter the total limit."); return; }
+    if (cardType === "debit" && !linkedAccountId) {
+      toast.error("Please select the bank account this debit card belongs to.");
+      return;
+    }
+    if (cardType === "credit" && !limit.trim()) {
+      toast.error("Please enter the total credit limit.");
+      return;
+    }
 
     setSaving(true);
     const digits = number.replace(/\D/g, "");
-    // Prefer the last-4 of a full PAN; otherwise use the last-4 we already know
-    // from the transaction we're linking (prefillLast4). This keeps the card
-    // matchable to its notification transactions even with no PAN entered.
     const last4 = digits.slice(-4) || (prefillLast4 ?? "");
     if (!last4) {
       toast.error("Enter at least the last 4 card digits so transactions can be linked automatically.");
       setSaving(false);
       return;
     }
+
     const payload = {
       cardName:   cardName.trim(),
       bank:       bank.trim(),
-      billCycle:  billCycle.trim(),
+      type:       cardType,
+      billCycle:  cardType === "credit" ? billCycle.trim() : "",
+      dueDate:    cardType === "credit" ? (dueDate.trim() || undefined) : undefined,
       number:     digits || undefined,
       cardHolder: cardHolder.trim() || undefined,
       network:    network.trim() || undefined,
       last4,
       expiry:     expiry.trim(),
-      limit:      parseFloat(limit) || 0,
+      limit:      cardType === "credit" ? (parseFloat(limit) || 0) : 0,
+      linkedAccountId: cardType === "debit" ? linkedAccountId : undefined,
     };
+
     if (isEdit) {
       updateCard(existing.id, payload);
       toast.success("Card updated.");
     } else {
-      addCard(payload);
-      // replay any notification txns that arrived before this card was added
-      const added = useCardStore.getState().cards.at(-1)!;
-      replayForNewCard(added);
-      toast.success("Card added.");
+      try {
+        const added = await addCard(payload);
+        replayForNewCard(added);
+        toast.success("Card added.");
+      } catch (e) {
+        toast.error(apiError(e, "Failed to save card. Check your connection and try again."));
+        setSaving(false);
+        return;
+      }
     }
     setSaving(false);
     router.back();
@@ -224,37 +236,89 @@ export default function AddCardScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View className="gap-5">
-            {/* Card Name — typeable dropdown from the card reference list;
-                selecting a known card prefills bank + network. */}
+
+            {/* Card type toggle */}
+            <View className="gap-[10px]">
+              <Text className="text-xs font-bold text-secondary uppercase tracking-widest">Card Type</Text>
+              <View className="flex-row gap-3">
+                {(["credit", "debit"] as const).map((t) => {
+                  const active = cardType === t;
+                  return (
+                    <TouchableOpacity
+                      key={t}
+                      onPress={() => {
+                        if (cardType === t) return;
+                        setCardType(t);
+                        setCardName("");
+                        setBank("");
+                        setProductIssuer("");
+                        setNetwork("");
+                      }}
+                      className={`flex-1 py-3 rounded-[12px] items-center border ${active ? "border-accent-purple" : "border-white/10"}`}
+                      style={{ backgroundColor: active ? "rgba(168,85,247,0.15)" : "rgba(255,255,255,0.06)" }}
+                    >
+                      <Text className={`text-sm font-semibold capitalize ${active ? "text-accent-purple-light" : "text-muted"}`}>
+                        {t}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Card Name */}
             <View className="gap-[10px]">
               <Text className="text-xs font-bold text-secondary uppercase tracking-widest">Card Name</Text>
               <CardProductPicker
                 value={cardName}
                 placeholder="Search your card"
+                cardType={cardType}
                 onSelect={(p) => {
                   setCardName(p.name);
-                  if (p.issuer) setBank(bankForIssuer(p.issuer));
+                  const knownIssuer = p.issuer && p.issuer !== "Multiple Banks" ? p.issuer : "";
+                  setProductIssuer(knownIssuer);
+                  if (knownIssuer) setBank(bankForIssuer(knownIssuer));
+                  else if (!knownIssuer) setBank("");
                   if (p.network) setNetwork(p.network);
                 }}
               />
             </View>
 
-            {/* Bank — same searchable picker used at onboarding */}
-            <View className="gap-[10px]">
-              <Text className="text-xs font-bold text-secondary uppercase tracking-widest">Card Bank</Text>
-              <BankPicker value={bank} onSelect={setBank} placeholder="Search your bank" />
-            </View>
+            {/* Bank — hidden when auto-filled from a bank-specific card */}
+            {productIssuer ? (
+              <View className="gap-[10px]">
+                <Text className="text-xs font-bold text-secondary uppercase tracking-widest">Card Bank</Text>
+                <View className="flex-row items-center justify-between rounded-[12px] px-4 py-[14px] border border-white/10"
+                  style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>
+                  <Text className="text-base text-white">{bank || productIssuer}</Text>
+                  <TouchableOpacity onPress={() => { setProductIssuer(""); setBank(""); }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="pencil-outline" size={16} color="#6b7280" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View className="gap-[10px]">
+                <Text className="text-xs font-bold text-secondary uppercase tracking-widest">Card Bank</Text>
+                <BankPicker value={bank} onSelect={setBank} placeholder="Search your bank" />
+              </View>
+            )}
 
-            <LabeledInput f={{ label: "Bill Cycle Date", value: billCycle, set: setBillDay, placeholder: "e.g., 22", keyboardType: "number-pad", maxLength: 2, hint: "Statement day of the month (1–31)." }} />
+            {/* Credit-only fields */}
+            {cardType === "credit" && (
+              <>
+                <LabeledInput f={{ label: "Statement Date", value: billCycle, set: setBillDay, placeholder: "e.g., 5", keyboardType: "number-pad", maxLength: 2, hint: "Day of the month your statement is generated (1–31)." }} />
+                <LabeledInput f={{ label: "Payment Due Date", value: dueDate, set: setDueDay, placeholder: "e.g., 25", keyboardType: "number-pad", maxLength: 2, optional: true, hint: "Day of the month your payment is due (1–31)." }} />
+              </>
+            )}
+
             <LabeledInput f={{ label: "Card Number", value: number, set: setNumberFmt, placeholder: "1234 5678 9012 3456", keyboardType: "number-pad", maxLength: 19, hint: prefillLast4 ? `Linking the card ending ${prefillLast4}. Keep just these 4 digits, or clear and type the full number to auto-detect the network.` : "Network is detected automatically. Stored securely, shown only on your vault page." }} />
 
             <LabeledInput f={{ label: "Card Holder", value: cardHolder, set: setCardHolder, placeholder: "Name on card" }} />
 
-            {/* Network — mandatory; auto-filled from the card number, editable. */}
+            {/* Network */}
             <View className="gap-[10px]">
-              <Text className="text-xs font-bold text-secondary uppercase tracking-widest">
-                Network
-              </Text>
+              <Text className="text-xs font-bold text-secondary uppercase tracking-widest">Network</Text>
               <View className="flex-row gap-2 flex-wrap">
                 {NETWORKS.map((n) => {
                   const active = network === n;
@@ -272,10 +336,57 @@ export default function AddCardScreen() {
               </View>
             </View>
 
-            {/* Expiry */}
             <LabeledInput f={{ label: "Expiry", value: expiry, set: setExpiryFmt, placeholder: "MM/YY", keyboardType: "number-pad", maxLength: 5, optional: true }} />
 
-            <LabeledInput f={{ label: "Total Limit", value: limit, set: (v) => setLimit(v.replace(/[^0-9.]/g, "")), placeholder: "0.00", keyboardType: "decimal-pad" }} />
+            {/* Credit limit — credit only */}
+            {cardType === "credit" && (
+              <LabeledInput f={{ label: "Total Limit", value: limit, set: (v) => setLimit(v.replace(/[^0-9.]/g, "")), placeholder: "0.00", keyboardType: "decimal-pad" }} />
+            )}
+
+            {/* Linked account — debit only */}
+            {cardType === "debit" && (
+              <View className="gap-[10px]">
+                <Text className="text-xs font-bold text-secondary uppercase tracking-widest">
+                  Linked Account <Text className="text-red-400">*</Text>
+                </Text>
+                {accounts.length === 0 ? (
+                  <Text className="text-sm text-muted">
+                    No bank accounts saved yet. Add a bank account first.
+                  </Text>
+                ) : (
+                  accounts.map((a) => {
+                    const active = linkedAccountId === a.id;
+                    const last4  = accountLast4(a);
+                    return (
+                      <TouchableOpacity
+                        key={a.id}
+                        onPress={() => setLinkedAccountId(active ? "" : a.id)}
+                        className={`flex-row items-center gap-3 px-4 py-3 rounded-[12px] border ${active ? "border-accent-purple" : "border-white/10"}`}
+                        style={{ backgroundColor: active ? "rgba(168,85,247,0.12)" : "rgba(255,255,255,0.04)" }}
+                      >
+                        <View
+                          className="w-8 h-8 rounded-full items-center justify-center"
+                          style={{ backgroundColor: active ? "rgba(168,85,247,0.25)" : "rgba(255,255,255,0.08)" }}
+                        >
+                          <Ionicons name={active ? "checkmark" : "wallet-outline"} size={15} color={active ? "#a855f7" : "#6b7280"} />
+                        </View>
+                        <View className="flex-1">
+                          <Text className={`text-sm font-semibold ${active ? "text-white" : "text-muted"}`}>
+                            {a.accountName?.trim() || a.nickname}
+                          </Text>
+                          <Text className="text-[11px] text-dim">
+                            {a.bank}{last4 ? ` · ••${last4}` : ""}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+                <Text className="text-[11px] text-dim">
+                  Debit card transactions update this account's balance automatically.
+                </Text>
+              </View>
+            )}
           </View>
         </ScrollView>
 

@@ -45,30 +45,32 @@ interface UserStore {
   phone:     string | null; // mandatory; used for sharing discovery
 
   // Authenticated user profile (populated from backend on login + each sync)
-  firstName: string | null;
-  lastName:  string | null;
-  fullName:  string | null;
-  email:     string | null;
-  avatarUrl: string | null;
+  firstName:   string | null;
+  lastName:    string | null;
+  fullName:    string | null;
+  email:       string | null;
+  avatarUrl:   string | null;
+  hasVaultPin: boolean;
 
   hydrateDeviceId: () => Promise<void>;
   setGuestName:    (name: string) => void;
   /** Alias used by setup.tsx — delegates to setGuestName */
   setName:         (name: string) => void;
   setPhone:        (phone: string) => void;
-  setProfile:      (p: { firstName?: string | null; lastName?: string | null; fullName?: string | null; email?: string | null; avatarUrl?: string | null }) => void;
+  setProfile:      (p: { firstName?: string | null; lastName?: string | null; fullName?: string | null; email?: string | null; avatarUrl?: string | null; hasVaultPin?: boolean }) => void;
   reset:           () => void;
 }
 
 export const useUserStore = create<UserStore>((set) => ({
-  deviceId:  null,
-  guestName: null,
-  phone:     null,
-  firstName: null,
-  lastName:  null,
-  fullName:  null,
-  email:     null,
-  avatarUrl: null,
+  deviceId:    null,
+  guestName:   null,
+  phone:       null,
+  firstName:   null,
+  lastName:    null,
+  fullName:    null,
+  email:       null,
+  avatarUrl:   null,
+  hasVaultPin: false,
 
   hydrateDeviceId: async () => {
     let id = await storage.get(KEY_DEVICE_ID);

@@ -11,6 +11,7 @@ import { useCardStore, selectTotalUsage } from "@/store/cardStore";
 import { fmtShort } from "@/utils/formatters";
 import { Avatar } from "@/components/ui/Avatar";
 import { logout } from "@/services/auth";
+import { clearAllDataStores } from "@/services/sync";
 import { toast } from "@/store/toastStore";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
@@ -64,7 +65,7 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     await logout();          // revoke this session server-side (best-effort)
-    resetUser();
+    clearAllDataStores();   // wipe all financial data before the next account signs in
     await signOut();
     router.replace("/(auth)/login");
   };

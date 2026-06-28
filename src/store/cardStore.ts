@@ -13,26 +13,28 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { bankMatches, resolveBankCode } from "@/store/accountStore";
 import { useBankStore } from "@/store/bankStore";
 import { pushCreate, pushUpdate, pushRemove } from "@/services/backend";
-import { uid } from "@/utils/id";
 
 export interface Card {
-  id:          string;
-  cardName:    string;   // e.g. "Regalia Gold"
-  bank:        string;   // e.g. "HDFC Bank" (display + fuzzy match; free text allowed)
-  bankCode?:   string;   // Bank reference code (IFSC prefix) when the bank is a listed one
-  billCycle:   string;   // statement day / label, e.g. "5"
-  number?:     string;   // full PAN (vault) — masked everywhere except vault page
-  cardHolder?: string;   // name printed on the card
-  network?:    string;   // "Visa" | "Mastercard" | "RuPay" | "Amex"
-  last4:       string;   // last 4 digits of the card (always shown)
-  expiry:      string;   // MM/YY
-  limit:       number;   // total credit limit
-  usage:       number;   // current outstanding / spent
+  id:               string;
+  cardName:         string;   // e.g. "Regalia Gold"
+  bank:             string;   // e.g. "HDFC Bank" (display + fuzzy match; free text allowed)
+  bankCode?:        string;   // Bank reference code (IFSC prefix) when the bank is a listed one
+  type:             "credit" | "debit";
+  billCycle:        string;   // statement generation day of month, e.g. "5"
+  dueDate?:         string;   // payment due day of month, e.g. "25"
+  number?:          string;   // full PAN — stripped from bootstrap, served only via GET /vault
+  cardHolder?:      string;   // name on card — stripped from bootstrap, served only via GET /vault
+  network?:         string;   // "Visa" | "Mastercard" | "RuPay" | "Amex"
+  last4:            string;   // last 4 digits of the card (always shown)
+  expiry:           string;   // MM/YY
+  limit:            number;   // total credit limit (0 for debit cards)
+  usage:            number;   // current outstanding (credit) / unused (debit — not tracked)
+  linkedAccountId?: string;   // Account.id — required when type = "debit"
 }
 
 interface CardStore {
   cards: Card[];
-  addCard:    (c: Omit<Card, "id" | "usage"> & { usage?: number }) => void;
+  addCard:    (c: Omit<Card, "id" | "usage"> & { usage?: number }) => Promise<Card>;
   updateCard: (id: string, updates: Partial<Omit<Card, "id">>) => void;
   removeCard: (id: string) => void;
   reset:      () => void;
@@ -43,10 +45,12 @@ export const useCardStore = create<CardStore>()(
     (set) => ({
       cards: [],
 
-      addCard: (c) => {
-        const card = { usage: 0, ...c, id: uid(), bankCode: c.bankCode ?? resolveBankCode(c.bank) };
+      addCard: async (c) => {
+        const base = { usage: 0, ...c, bankCode: c.bankCode ?? resolveBankCode(c.bank) };
+        const { id } = await pushCreate("cards", base);
+        const card = { ...base, id };
         set((s) => ({ cards: [...s.cards, card] }));
-        pushCreate("cards", card);
+        return card;
       },
 
       updateCard: (id, updates) => {

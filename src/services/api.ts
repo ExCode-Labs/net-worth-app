@@ -1,5 +1,6 @@
 import axios, { create, type AxiosRequestConfig, isAxiosError } from "axios";
-import { getGuestIdentity } from "@/services/deviceId";
+import { getDeviceIdentity } from "@/services/deviceId";
+import * as Device from "expo-device";
 
 export const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? "";
 export const apiEnabled = API_BASE.length > 0;
@@ -18,16 +19,24 @@ const client = create({ baseURL: API_BASE, timeout: 30000 });
 
 // ── Request: inject auth headers ──────────────────────────────────────────────
 
+// Build once — Device values are static per process (model/OS don't change).
+const deviceModel = (() => {
+  const model = Device.modelName ?? Device.brand ?? null;
+  const os = Device.osName ? `${Device.osName} ${Device.osVersion ?? ""}`.trim() : null;
+  return model && os ? `${model} (${os})` : model ?? os ?? null;
+})();
+
 client.interceptors.request.use(async (config) => {
   const { accessToken, isGuest } = getAuthStore().getState();
   if (accessToken && !isGuest) {
     config.headers["Authorization"] = `Bearer ${accessToken}`;
   } else {
-    const { guestKey, deviceId, hardwareId } = await getGuestIdentity();
-    config.headers["X-Guest-Key"] = guestKey;
+    const { deviceKey, deviceId, hardwareId } = await getDeviceIdentity();
+    config.headers["X-Device-Key"] = deviceKey;
     config.headers["X-Device-Id"] = deviceId;
     if (hardwareId) config.headers["X-Hardware-Id"] = hardwareId;
   }
+  if (deviceModel) config.headers["X-Device-Model"] = deviceModel;
   return config;
 });
 

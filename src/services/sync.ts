@@ -10,10 +10,10 @@
  *     signed in".
  *
  * Per-entity writes happen optimistically inside the stores (see each store's
- * actions calling backend.pushCreate/Update/Remove). This module only handles
+ * actions calling backend.pushCreate/syncCreate/Update/Remove). This module only handles
  * the initial load + reconcile. No-ops cleanly when no backend is configured.
  */
-import { fetchBootstrap, pushCreate, isDirty, clearDirty, type Bootstrap } from "@/services/backend";
+import { fetchBootstrap, syncCreate, isDirty, clearDirty, type Bootstrap } from "@/services/backend";
 import { apiEnabled } from "@/services/api";
 import { useAccountStore } from "@/store/accountStore";
 import { useCardStore } from "@/store/cardStore";
@@ -43,11 +43,12 @@ function hydrateProfile(b: Bootstrap) {
   if (b.me.guestName) useUserStore.setState({ guestName: b.me.guestName });
   if (b.me.phone) useUserStore.setState({ phone: b.me.phone });
   useUserStore.getState().setProfile({
-    firstName: b.me.firstName,
-    lastName:  b.me.lastName,
-    fullName:  b.me.fullName,
-    email:     b.me.email,
-    avatarUrl: b.me.avatarUrl,
+    firstName:   b.me.firstName,
+    lastName:    b.me.lastName,
+    fullName:    b.me.fullName,
+    email:       b.me.email,
+    avatarUrl:   b.me.avatarUrl,
+    hasVaultPin: b.me.hasVaultPin ?? false,
   });
 }
 
@@ -74,11 +75,11 @@ export function pushAllLocal() {
 /** Re-push every local entity (idempotent) so the server matches the device. */
 function reconcilePush() {
   const a = useAccountStore.getState();
-  a.accounts.forEach((x) => pushCreate("accounts", x));
-  a.assets.forEach((x) => pushCreate("assets", x));
-  useCardStore.getState().cards.forEach((x) => pushCreate("cards", x));
-  useLiabilityStore.getState().liabilities.forEach((x) => pushCreate("liabilities", x));
-  useTransactionStore.getState().transactions.forEach((x) => pushCreate("transactions", x));
+  a.accounts.forEach((x) => syncCreate("accounts", x));
+  a.assets.forEach((x) => syncCreate("assets", x));
+  useCardStore.getState().cards.forEach((x) => syncCreate("cards", x));
+  useLiabilityStore.getState().liabilities.forEach((x) => syncCreate("liabilities", x));
+  useTransactionStore.getState().transactions.forEach((x) => syncCreate("transactions", x));
   clearDirty();
 }
 
@@ -123,6 +124,19 @@ export async function startSync(): Promise<void> {
 
 export function stopSync() {
   // Per-entity pushes are fire-and-forget inside the stores; nothing to tear down.
+}
+
+/**
+ * Wipe all persisted financial data from every store.
+ * Call before signing out so the next login (possibly a different account)
+ * starts with an empty local state and hydrates cleanly from the server.
+ */
+export function clearAllDataStores(): void {
+  useAccountStore.getState().reset();
+  useCardStore.getState().reset();
+  useLiabilityStore.getState().reset();
+  useTransactionStore.getState().reset();
+  useUserStore.getState().reset();
 }
 
 /** Manual reconcile (e.g. pull-to-refresh / returning to foreground). */

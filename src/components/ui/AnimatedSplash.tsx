@@ -15,7 +15,7 @@ import { useAuthStore } from "@/store/authStore";
  * The Android 12+ system splash only shows a centered icon, so we render our
  * own edge-to-edge splash image on top of the app. It appears the moment the
  * JS layer mounts (we hide the native splash on first layout) and stays until
- * the app is actually ready (Clerk auth loaded + persisted state hydrated),
+ * the app is actually ready (auth state loaded + persisted state hydrated),
  * then fades out — so the user never sees a blank/half-loaded screen.
  */
 export function AnimatedSplash() {

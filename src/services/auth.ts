@@ -13,6 +13,7 @@ export interface DeviceSession {
   id:         string;
   device:     string | null;
   ipAddress:  string | null;
+  location:   string | null;
   createdAt:  string;
   lastUsedAt: string;
   current:    boolean;

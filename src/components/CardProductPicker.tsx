@@ -25,19 +25,20 @@ interface Props {
   value:        string;
   onSelect:     (p: { name: string; issuer?: string; network?: string }) => void;
   placeholder?: string;
+  cardType?:    "credit" | "debit";
 }
 
 const SNAP = ["80%"];
 const BG   = "#0d1225";
 
-export default function CardProductPicker({ value, onSelect, placeholder }: Props) {
+export default function CardProductPicker({ value, onSelect, placeholder, cardType }: Props) {
   const ref            = useRef<BottomSheetModal>(null);
   const [query, setQuery] = useState("");
   const products       = useCardProductStore((s) => s.products);
 
-  const results    = useMemo(() => searchCardProducts(query, products), [query, products]);
+  const results    = useMemo(() => searchCardProducts(query, products, cardType), [query, products, cardType]);
   const typedIsNew = query.trim().length > 0 &&
-    !products.some((c) => c.name.toLowerCase() === query.trim().toLowerCase());
+    !results.some((c) => c.name.toLowerCase() === query.trim().toLowerCase());
 
   const open  = () => ref.current?.present();
   const pick  = (p: { name: string; issuer?: string; network?: string }) => {

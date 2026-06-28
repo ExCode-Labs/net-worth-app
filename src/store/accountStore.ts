@@ -5,9 +5,8 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { pushCreate, pushUpdate, pushRemove, updateMe } from "@/services/backend";
+import { pushCreate, syncCreate, pushUpdate, pushRemove, updateMe } from "@/services/backend";
 import { useBankStore } from "@/store/bankStore";
-import { uid } from "@/utils/id";
 
 export interface Account {
   id: string;
@@ -88,10 +87,10 @@ interface AccountStore {
   assets:   Asset[];
 
   setCurrency:   (c: string) => void;
-  addAccount:    (a: Omit<Account, "id">) => void;
+  addAccount:    (a: Omit<Account, "id">) => Promise<Account>;
   updateAccount: (id: string, updates: Partial<Omit<Account, "id">>) => void;
   removeAccount: (id: string) => void;
-  addAsset:      (a: Omit<Asset, "id">) => void;
+  addAsset:      (a: Omit<Asset, "id">) => Promise<Asset>;
   updateAsset:   (id: string, updates: Partial<Omit<Asset, "id">>) => void;
   removeAsset:   (id: string) => void;
   reset:         () => void;
@@ -113,10 +112,12 @@ export const useAccountStore = create<AccountStore>()(
         void updateMe({ currency });
       },
 
-      addAccount: (a) => {
-        const account = { ...a, id: uid(), bankCode: a.bankCode ?? resolveBankCode(a.bank) };
+      addAccount: async (a) => {
+        const base = { ...a, bankCode: a.bankCode ?? resolveBankCode(a.bank) };
+        const { id } = await pushCreate("accounts", base);
+        const account = { ...base, id };
         set((s) => ({ accounts: [...s.accounts, account] }));
-        pushCreate("accounts", account);
+        return account;
       },
 
       updateAccount: (id, updates) => {
@@ -137,10 +138,11 @@ export const useAccountStore = create<AccountStore>()(
         pushRemove("accounts", id);
       },
 
-      addAsset: (a) => {
-        const asset = { ...a, id: uid() };
+      addAsset: async (a) => {
+        const { id } = await pushCreate("assets", a);
+        const asset = { ...a, id };
         set((s) => ({ assets: [...s.assets, asset] }));
-        pushCreate("assets", asset);
+        return asset;
       },
 
       updateAsset: (id, updates) => {
