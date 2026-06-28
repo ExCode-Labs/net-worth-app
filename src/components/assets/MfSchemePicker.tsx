@@ -86,23 +86,25 @@ export default function MfSchemePicker({ value, onSelect }: Props) {
         handleIndicatorStyle={{ backgroundColor: "rgba(255,255,255,0.18)", width: 40, height: 4 }}
         backgroundStyle={{ backgroundColor: BG, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderTopColor: C.border }}>
 
-        <BottomSheetView style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
-          <Text style={{ fontSize: 17, fontWeight: "700", color: C.textPrimary, marginBottom: 12 }}>Find your fund</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 12,
-            borderWidth: 1, borderColor: C.border, backgroundColor: C.bgEl, paddingHorizontal: 12, marginBottom: 4 }}>
-            <Ionicons name="search" size={18} color={C.textMuted} />
-            <TextInput value={query} onChangeText={setQuery} placeholder="e.g., HDFC Flexi Cap"
-              placeholderTextColor={C.textDim} autoFocus autoCorrect={false}
-              style={{ flex: 1, fontSize: 14, color: C.textPrimary, paddingVertical: 12 }} />
-            {loading && <ActivityIndicator size="small" color={C.textMuted} />}
+        <BottomSheetView style={{ flex: 1 }}>
+          <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+            <Text style={{ fontSize: 17, fontWeight: "700", color: C.textPrimary, marginBottom: 12 }}>Find your fund</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 12,
+              borderWidth: 1, borderColor: C.border, backgroundColor: C.bgEl, paddingHorizontal: 12 }}>
+              <Ionicons name="search" size={18} color={C.textMuted} />
+              <TextInput value={query} onChangeText={setQuery} placeholder="e.g., HDFC Flexi Cap"
+                placeholderTextColor={C.textDim} autoFocus autoCorrect={false}
+                style={{ flex: 1, fontSize: 14, color: C.textPrimary, paddingVertical: 12 }} />
+              {loading && <ActivityIndicator size="small" color={C.textMuted} />}
+            </View>
           </View>
-        </BottomSheetView>
 
-        <BottomSheetFlatList
+          <BottomSheetFlatList
           data={results}
           keyExtractor={(s) => String(s.schemeCode)}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
           ListEmptyComponent={
             <Text style={{ fontSize: 13, color: C.textMuted, textAlign: "center", marginTop: 32 }}>
@@ -112,6 +114,7 @@ export default function MfSchemePicker({ value, onSelect }: Props) {
           }
           renderItem={renderItem}
         />
+        </BottomSheetView>
       </BottomSheetModal>
     </>
   );

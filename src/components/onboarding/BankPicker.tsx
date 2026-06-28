@@ -82,29 +82,31 @@ export default function BankPicker({ value, onSelect, placeholder }: Props) {
         handleIndicatorStyle={{ backgroundColor: "rgba(255,255,255,0.18)", width: 40, height: 4 }}
         backgroundStyle={{ backgroundColor: BG, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderTopColor: C.border }}>
 
-        {/* Header + search — fixed */}
-        <BottomSheetView style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
-          <Text style={{ fontSize: 17, fontWeight: "700", color: C.textPrimary, marginBottom: 12 }}>Select your bank</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 12,
-            borderWidth: 1, borderColor: C.border, backgroundColor: C.bgEl, paddingHorizontal: 12, marginBottom: 4 }}>
-            <Ionicons name="search" size={18} color={C.textMuted} />
-            <TextInput value={query} onChangeText={setQuery} placeholder="Search 60+ banks…"
-              placeholderTextColor={C.textDim} autoFocus autoCorrect={false}
-              style={{ flex: 1, fontSize: 14, color: C.textPrimary, paddingVertical: 12 }} />
-            {query.length > 0 && (
-              <TouchableOpacity onPress={() => setQuery("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close-circle" size={18} color={C.textMuted} />
-              </TouchableOpacity>
-            )}
+        <BottomSheetView style={{ flex: 1 }}>
+          {/* Header + search — fixed */}
+          <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+            <Text style={{ fontSize: 17, fontWeight: "700", color: C.textPrimary, marginBottom: 12 }}>Select your bank</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 12,
+              borderWidth: 1, borderColor: C.border, backgroundColor: C.bgEl, paddingHorizontal: 12 }}>
+              <Ionicons name="search" size={18} color={C.textMuted} />
+              <TextInput value={query} onChangeText={setQuery} placeholder="Search 60+ banks…"
+                placeholderTextColor={C.textDim} autoFocus autoCorrect={false}
+                style={{ flex: 1, fontSize: 14, color: C.textPrimary, paddingVertical: 12 }} />
+              {query.length > 0 && (
+                <TouchableOpacity onPress={() => setQuery("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close-circle" size={18} color={C.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-        </BottomSheetView>
 
-        {/* Results list — scrollable */}
-        <BottomSheetFlatList
+          {/* Results list — scrollable */}
+          <BottomSheetFlatList
           data={results}
           keyExtractor={(b) => b.code}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
           ListHeaderComponent={typedIsNew ? (
             <TouchableOpacity onPress={() => pick(query.trim())}
@@ -124,6 +126,7 @@ export default function BankPicker({ value, onSelect, placeholder }: Props) {
           }
           renderItem={renderItem}
         />
+        </BottomSheetView>
       </BottomSheetModal>
     </>
   );

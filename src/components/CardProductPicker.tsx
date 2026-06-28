@@ -87,27 +87,29 @@ export default function CardProductPicker({ value, onSelect, placeholder }: Prop
         handleIndicatorStyle={{ backgroundColor: "rgba(255,255,255,0.18)", width: 40, height: 4 }}
         backgroundStyle={{ backgroundColor: BG, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderTopColor: C.border }}>
 
-        <BottomSheetView style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
-          <Text style={{ fontSize: 17, fontWeight: "700", color: C.textPrimary, marginBottom: 12 }}>Select your card</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 12,
-            borderWidth: 1, borderColor: C.border, backgroundColor: C.bgEl, paddingHorizontal: 12, marginBottom: 4 }}>
-            <Ionicons name="search" size={18} color={C.textMuted} />
-            <TextInput value={query} onChangeText={setQuery} placeholder="Search cards…"
-              placeholderTextColor={C.textDim} autoFocus autoCorrect={false}
-              style={{ flex: 1, fontSize: 14, color: C.textPrimary, paddingVertical: 12 }} />
-            {query.length > 0 && (
-              <TouchableOpacity onPress={() => setQuery("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close-circle" size={18} color={C.textMuted} />
-              </TouchableOpacity>
-            )}
+        <BottomSheetView style={{ flex: 1 }}>
+          <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+            <Text style={{ fontSize: 17, fontWeight: "700", color: C.textPrimary, marginBottom: 12 }}>Select your card</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 12,
+              borderWidth: 1, borderColor: C.border, backgroundColor: C.bgEl, paddingHorizontal: 12 }}>
+              <Ionicons name="search" size={18} color={C.textMuted} />
+              <TextInput value={query} onChangeText={setQuery} placeholder="Search cards…"
+                placeholderTextColor={C.textDim} autoFocus autoCorrect={false}
+                style={{ flex: 1, fontSize: 14, color: C.textPrimary, paddingVertical: 12 }} />
+              {query.length > 0 && (
+                <TouchableOpacity onPress={() => setQuery("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close-circle" size={18} color={C.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-        </BottomSheetView>
 
-        <BottomSheetFlatList
+          <BottomSheetFlatList
           data={results}
           keyExtractor={(c) => c.id}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }}
           ListHeaderComponent={typedIsNew ? (
             <TouchableOpacity onPress={() => pick({ name: query.trim() })}
@@ -127,6 +129,7 @@ export default function CardProductPicker({ value, onSelect, placeholder }: Prop
           }
           renderItem={renderItem}
         />
+        </BottomSheetView>
       </BottomSheetModal>
     </>
   );
