@@ -116,7 +116,10 @@ export function ingestCardMessage(raw: string, receivedAtMs?: number, sender?: s
 
   const card = findMatchingCard(useCardStore.getState().cards, parsed.bank, parsed.cardLast4);
 
-  useTransactionStore.getState().addTransaction(cardToTransaction(parsed));
+  // Stamp cardId immediately when the card is known, so this transaction is
+  // never picked up by replayForNewCard and double-counted.
+  const txData = cardToTransaction(parsed);
+  useTransactionStore.getState().addTransaction(card ? { ...txData, cardId: card.id } : txData);
 
   if (card) {
     const delta = parsed.direction === "payment" ? -parsed.amount : parsed.amount;
@@ -163,12 +166,15 @@ export function replayForNewAccount(account: Account): void {
 /**
  * Called after a new card is saved. Finds all unlinked notification
  * transactions that match this card and adds their net spend to usage.
+ * Also stamps each matched transaction with cardId so future replays
+ * don't double-count them.
  */
 export function replayForNewCard(card: Card): void {
-  const txns = useTransactionStore.getState().transactions;
+  const { transactions, updateTransaction } = useTransactionStore.getState();
   const last4 = (t: Transaction) => t.account.replace(/\D/g, "").slice(-4);
-  const matched = txns.filter(
-    (t) => t.source === "notification" && !t.accountId &&
+  const matched = transactions.filter(
+    // !t.cardId: skip transactions already linked to a card (this or another)
+    (t) => t.source === "notification" && !t.cardId && !t.accountId &&
       findMatchingCard([card], t.bank, last4(t)),
   );
   if (!matched.length) return;
@@ -179,6 +185,7 @@ export function replayForNewCard(card: Card): void {
   useCardStore.getState().updateCard(card.id, {
     usage: Math.max(0, card.usage + net),
   });
+  matched.forEach((t) => updateTransaction(t.id, { cardId: card.id }));
 }
 
 /** Ingest a batch of raw messages and return a summary count. */

@@ -265,7 +265,13 @@ function isCreditCard(text: string): boolean {
     /\bBLOCK\s+CC\b/i.test(text) ||
     /\bcardmember\b/i.test(text) ||
     /credited to your card ending/i.test(text) ||
-    /adjusted against .*card/i.test(text)
+    /adjusted against .*card/i.test(text) ||
+    // Indian banks that skip the "credit card" phrase in some notification templates:
+    /\bSBI\s+Card\b/i.test(text) ||                           // SBI Cards & Payment Services
+    /\bavl(?:ailable)?\s+(?:cr(?:edit)?\s+)?limit\b/i.test(text) || // "Avl Limit" / "available credit limit"
+    /\bcredit\s+limit\b/i.test(text) ||                       // "credit limit" is exclusive to CC alerts
+    /\bmin(?:imum)?\s+(?:amount\s+)?due\b/i.test(text) ||    // "minimum due" on billing statement SMSes
+    /\btotal\s+(?:amount\s+)?due\b/i.test(text)              // "total due" on billing statement SMSes
   );
 }
 

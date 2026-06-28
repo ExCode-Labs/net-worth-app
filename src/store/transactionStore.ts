@@ -23,6 +23,7 @@ export interface Transaction {
   account:      string;       // last-4 or account label (display only)
   accountId?:   string;       // account store id — set for manual txns, drives balance update
   toAccountId?: string;       // destination account id for Transfer type
+  cardId?:      string;       // card store id — set when a notification txn is matched to a card
   bank:         string;
   date:         string;       // ISO string
   note:         string;

@@ -82,7 +82,7 @@ export default function MonthCalendar({
       {/* Day grid */}
       <View className="flex-row flex-wrap">
         {cells.map((d, i) => {
-          if (!d) return <View key={i} style={{ width: `${100 / 7}%`, aspectRatio: 0.78 }} />;
+          if (!d) return <View key={i} style={{ width: `${100 / 7}%`, aspectRatio: 1.1 }} />;
           const k = dayKey(d);
           const t = totals.get(k);
           const isToday = k === todayKey;
@@ -92,11 +92,12 @@ export default function MonthCalendar({
               key={i}
               onPress={() => onSelectDay(d)}
               activeOpacity={0.7}
-              style={{ width: `${100 / 7}%`, aspectRatio: 0.78, padding: 2 }}
+              style={{ width: `${100 / 7}%`, aspectRatio: t ? 0.78 : 1.1, padding: 2 }}
             >
               <View
                 className="flex-1 rounded-[9px] items-center pt-1"
                 style={{
+                  overflow: "hidden",
                   backgroundColor: isSel ? "rgba(168,85,247,0.22)" : "transparent",
                   borderWidth: isSel ? 1 : isToday ? 1 : 0,
                   borderColor: isSel ? "#a855f7" : isToday ? "rgba(255,255,255,0.18)" : "transparent",
@@ -105,14 +106,16 @@ export default function MonthCalendar({
                 <Text className="text-[12px] font-semibold" style={{ color: isToday || isSel ? "#fff" : "#cbd5e1" }}>
                   {d.getDate()}
                 </Text>
-                <View className="items-center" style={{ marginTop: 1 }}>
-                  {t && t.income > 0 ? (
-                    <Text className="text-[8px] font-bold" style={{ color: "#4ade80" }} numberOfLines={1}>+{tiny(t.income)}</Text>
-                  ) : null}
-                  {t && t.expense > 0 ? (
-                    <Text className="text-[8px] font-bold" style={{ color: "#f87171" }} numberOfLines={1}>-{tiny(t.expense)}</Text>
-                  ) : null}
-                </View>
+                {t ? (
+                  <View style={{ marginTop: 1, width: "100%", alignItems: "center" }}>
+                    {t.income > 0 ? (
+                      <Text className="text-[8px] font-bold" style={{ color: "#4ade80" }} numberOfLines={1}>+{tiny(t.income)}</Text>
+                    ) : null}
+                    {t.expense > 0 ? (
+                      <Text className="text-[8px] font-bold" style={{ color: "#f87171" }} numberOfLines={1}>-{tiny(t.expense)}</Text>
+                    ) : null}
+                  </View>
+                ) : null}
               </View>
             </TouchableOpacity>
           );

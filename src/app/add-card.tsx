@@ -145,6 +145,11 @@ export default function AddCardScreen() {
     // from the transaction we're linking (prefillLast4). This keeps the card
     // matchable to its notification transactions even with no PAN entered.
     const last4 = digits.slice(-4) || (prefillLast4 ?? "");
+    if (!last4) {
+      toast.error("Enter at least the last 4 card digits so transactions can be linked automatically.");
+      setSaving(false);
+      return;
+    }
     const payload = {
       cardName:   cardName.trim(),
       bank:       bank.trim(),

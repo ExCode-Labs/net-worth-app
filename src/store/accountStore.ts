@@ -248,10 +248,13 @@ export function findMatchingAccount(
  */
 export function isOrphanTransaction(
   accounts: Account[],
-  t: { account: string; bank: string; source: string },
+  t: { account: string; bank: string; source: string; cardId?: string },
 ): boolean {
   if (t.source === "manual") return false;
   if (t.account.startsWith("Card ")) return false;
+  // Notification misrouted through the bank parser but later stamped by
+  // replayForNewCard — it belongs to a card now, not an account orphan.
+  if (t.cardId) return false;
   const last4 = t.account.replace(/\D/g, "").slice(-4);
   return !findMatchingAccount(accounts, t.bank, last4);
 }
