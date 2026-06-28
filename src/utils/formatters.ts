@@ -5,11 +5,14 @@ export function fmt(n: number): string {
   return `₹${Math.abs(n).toLocaleString("en-IN")}`;
 }
 
-/** ₹1.2L or ₹120K */
+/** ₹1.2L · ₹4.5K · ₹500 (one decimal, trailing .0 trimmed; keeps sign) */
+const trimDec = (v: number) => v.toFixed(1).replace(/\.0$/, "");
 export function fmtShort(n: number): string {
-  return n >= 1_00_000
-    ? `₹${(n / 1_00_000).toFixed(1)}L`
-    : `₹${(n / 1000).toFixed(0)}K`;
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (abs >= 1_00_000) return `${sign}₹${trimDec(abs / 1_00_000)}L`;
+  if (abs >= 1000) return `${sign}₹${trimDec(abs / 1000)}K`;
+  return `${sign}₹${Math.round(abs)}`;
 }
 
 /** "Good Morning" / "Good Afternoon" / "Good Evening" */
