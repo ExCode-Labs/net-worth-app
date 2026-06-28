@@ -1,65 +1,52 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
+/** NetWorth – Dark Cosmic Theme */
 
-import '@/global.css';
+export const C = {
+  // Backgrounds
+  bgDeep:    "#0a0e27",  // page background
+  bgCard:    "#0f1629",  // card / surface
+  bgEl:      "rgba(255,255,255,0.05)", // elevated element
+  bgElHover: "rgba(255,255,255,0.08)",
+  border:    "rgba(255,255,255,0.08)",
+  borderMid: "rgba(255,255,255,0.12)",
 
-import { Platform } from 'react-native';
+  // Accents
+  purple:    "#a855f7",
+  purpleMid: "#9333ea",
+  purpleLight: "#c084fc",
+  blue:      "#3b82f6",
 
-export const Colors = {
-  light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-  },
-  dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
-  },
+  // Semantic
+  green:     "#4ade80",
+  greenDim:  "rgba(74,222,128,0.15)",
+  greenBorder:"rgba(74,222,128,0.25)",
+  red:       "#f87171",
+  redDim:    "rgba(248,113,113,0.12)",
+  redBorder: "rgba(248,113,113,0.2)",
+  amber:     "#fbbf24",
+
+  // Text
+  textPrimary:   "#ffffff",
+  textSecondary: "#9ca3af",
+  textMuted:     "#6b7280",
+  textDim:       "#4b5563",
 } as const;
 
-export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
-
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
-    mono: 'var(--font-mono)',
-  },
-});
-
-export const Spacing = {
-  half: 2,
-  one: 4,
-  two: 8,
-  three: 16,
-  four: 24,
-  five: 32,
-  six: 64,
+/** Drop-shadow helpers (boxShadow = cross-platform, elevation = Android z-order) */
+export const S = {
+  purple: {
+    boxShadow: "0 6px 20px rgba(168, 85, 247, 0.45)",
+    elevation: 10,
+  } as const,
+  purpleSm: {
+    boxShadow: "0 3px 10px rgba(168, 85, 247, 0.35)",
+    elevation: 6,
+  } as const,
+  card: {
+    boxShadow: "0 2px 12px rgba(0, 0, 0, 0.5)",
+    elevation: 4,
+  } as const,
+  sm: {
+    boxShadow: "0 1px 6px rgba(0, 0, 0, 0.3)",
+    elevation: 2,
+  } as const,
 } as const;
-
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
-export const MaxContentWidth = 800;

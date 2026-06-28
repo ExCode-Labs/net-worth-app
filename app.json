@@ -1,44 +1,66 @@
 {
   "expo": {
-    "name": "app",
-    "slug": "app",
+    "name": "NetWorth",
+    "slug": "networth",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "app",
-    "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
+    "scheme": "networth",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0a0e27",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/icon.png",
+      "supportsTablet": false,
+      "bundleIdentifier": "com.excodelabs.networth"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/foreground.png",
+        "backgroundImage": "./assets/background.png",
+        "monochromeImage": "./assets/monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": true,
+      "package": "com.excodelabs.networth",
+      "permissions": [],
+      "allowBackup": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/favicon.ico",
+      "bundler": "metro"
     },
     "plugins": [
       "expo-router",
+      "expo-secure-store",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
-          }
+          "backgroundColor": "#0a0e27",
+          "image": "./assets/foreground.png",
+          "imageWidth": 200,
+          "resizeMode": "contain"
         }
-      ]
+      ],
+      "@react-native-google-signin/google-signin",
+      "expo-image",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow NetWorth to find friends who already use the app so you can share with them."
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d2cdb99d-a120-453f-bda8-c4981c22179d"
+      }
     }
   }
 }
