@@ -418,14 +418,14 @@ export default function SetupScreen() {
         {/* ── Bottom bar: dots + CTA ───────────────────────────── */}
         <Animated.View
           entering={FadeIn.duration(400)}
-          className="px-xl pt-3 gap-[10px] mt-auto"
+          className="px-xl pt-2 gap-2 mt-auto"
           style={{
             borderTopWidth: 1,
             borderTopColor: "rgba(255,255,255,0.06)",
           }}
         >
           {/* Dots centered */}
-          <View className="flex-row gap-1.5 items-center justify-center mb-0.5">
+          <View className="flex-row gap-1.5 items-center justify-center">
             {Array.from({ length: TOTAL }, (_, i) => (
               <StepDot key={i} index={i} currentStep={step} />
             ))}
@@ -440,7 +440,7 @@ export default function SetupScreen() {
           {step < TOTAL && (
             <TouchableOpacity
               onPress={handleSkipStep}
-              className="items-center py-1.5"
+              className="items-center py-0.5"
             >
               <Text className="text-sm text-dim font-semibold">
                 {skipStepLabel}
