@@ -4,7 +4,7 @@
  * the system share sheet (WhatsApp, etc.); Edit/Delete manage the entry.
  */
 import React, { useRef, useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -14,6 +14,7 @@ import { useTransactionStore } from "@/store/transactionStore";
 import { TX_TYPE_COLORS } from "@/constants/categories";
 import { fmt } from "@/utils/formatters";
 import { toast } from "@/store/toastStore";
+import { confirm } from "@/store/confirmStore";
 
 const ICON: Record<string, React.ComponentProps<typeof Ionicons>["name"]> = {
   Expense:  "arrow-up-circle",
@@ -74,14 +75,13 @@ export default function TransactionDetailScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert("Delete transaction", "Remove this transaction? This can't be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => { remove(tx.id); toast.success("Transaction deleted."); router.back(); },
-      },
-    ]);
+    confirm({
+      title: "Delete transaction",
+      message: "Remove this transaction? This can't be undone.",
+      confirmText: "Delete",
+      destructive: true,
+      onConfirm: () => { remove(tx.id); toast.success("Transaction deleted."); router.back(); },
+    });
   };
 
   return (

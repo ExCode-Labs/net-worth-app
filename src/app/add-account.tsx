@@ -11,7 +11,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,6 +20,7 @@ import { Button } from "@/components/ui/Button";
 import { useAccountStore } from "@/store/accountStore";
 import { replayForNewAccount } from "@/services/bankIngest";
 import { toast } from "@/store/toastStore";
+import { confirm } from "@/store/confirmStore";
 
 const EMPTY: AccountForm = {
   type: "bank",
@@ -91,14 +91,13 @@ export default function AddAccountScreen() {
 
   const handleDelete = () => {
     if (!existing) return;
-    Alert.alert("Delete account", `Remove "${existing.nickname || existing.bank}"? This can't be undone.`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => { removeAccount(existing.id); toast.success("Account deleted."); router.back(); },
-      },
-    ]);
+    confirm({
+      title: "Delete account",
+      message: `Remove "${existing.nickname || existing.bank}"? This can't be undone.`,
+      confirmText: "Delete",
+      destructive: true,
+      onConfirm: () => { removeAccount(existing.id); toast.success("Account deleted."); router.back(); },
+    });
   };
 
   return (

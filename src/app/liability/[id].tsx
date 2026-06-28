@@ -5,7 +5,7 @@
  * net worth. Edit reuses the Add Liability form in edit mode.
  */
 import React, { useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, Alert, Linking } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -15,6 +15,7 @@ import { useTransactionStore } from "@/store/transactionStore";
 import { SettleSheet, accountRefLabel, txnRefLabel } from "@/components/ui/LedgerLink";
 import { fmt } from "@/utils/formatters";
 import { toast } from "@/store/toastStore";
+import { confirm } from "@/store/confirmStore";
 import { LIABILITY_TYPES } from "../liabilities";
 
 export default function LiabilityDetailScreen() {
@@ -58,11 +59,13 @@ export default function LiabilityDetailScreen() {
   if (liability.closed && d.toTxnId) rows.push({ label: "Repaid txn", value: txnRefLabel(transactions.find((t) => t.id === d.toTxnId)) });
 
   const handleDelete = () => {
-    Alert.alert("Delete liability", `Remove "${liability.name}"? This can't be undone.`, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive",
-        onPress: () => { removeLiability(liability.id); toast.success("Liability deleted."); router.back(); } },
-    ]);
+    confirm({
+      title: "Delete liability",
+      message: `Remove "${liability.name}"? This can't be undone.`,
+      confirmText: "Delete",
+      destructive: true,
+      onConfirm: () => { removeLiability(liability.id); toast.success("Liability deleted."); router.back(); },
+    });
   };
 
   const handleClose = () => {

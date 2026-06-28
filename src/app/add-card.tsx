@@ -15,7 +15,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -27,6 +26,7 @@ import { useCardStore, bankForIssuer } from "@/store/cardStore";
 import { replayForNewCard } from "@/services/bankIngest";
 import { useUserStore } from "@/store/userStore";
 import { toast } from "@/store/toastStore";
+import { confirm } from "@/store/confirmStore";
 
 const NETWORKS = ["Visa", "Mastercard", "RuPay", "Amex", "Diners Club"] as const;
 
@@ -164,14 +164,13 @@ export default function AddCardScreen() {
 
   const handleDelete = () => {
     if (!existing) return;
-    Alert.alert("Delete card", `Remove "${existing.cardName}"? This can't be undone.`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => { removeCard(existing.id); toast.success("Card deleted."); router.back(); },
-      },
-    ]);
+    confirm({
+      title: "Delete card",
+      message: `Remove "${existing.cardName}"? This can't be undone.`,
+      confirmText: "Delete",
+      destructive: true,
+      onConfirm: () => { removeCard(existing.id); toast.success("Card deleted."); router.back(); },
+    });
   };
 
   return (

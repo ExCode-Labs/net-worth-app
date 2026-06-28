@@ -9,6 +9,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useAuthStore } from "@/store/authStore";
 import { useUserStore } from "@/store/userStore";
 import { Toast } from "@/components/ui/Toast";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AnimatedSplash } from "@/components/ui/AnimatedSplash";
 import { startSync, stopSync, resync } from "@/services/sync";
 import { useSecurityStore } from "@/store/securityStore";
@@ -166,6 +167,7 @@ export default function RootLayout() {
           <SyncController />
           <RouteGate />
           <Toast />
+          <ConfirmDialog />
           <AnimatedSplash />
           <LockGate />
         </SafeAreaProvider>

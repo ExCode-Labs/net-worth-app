@@ -11,7 +11,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,6 +19,7 @@ import { Button } from "@/components/ui/Button";
 import AssetForm, { EMPTY_ASSET_DRAFT, buildAsset, draftFromAsset, type AssetDraft } from "@/components/assets/AssetForm";
 import { useAccountStore } from "@/store/accountStore";
 import { toast } from "@/store/toastStore";
+import { confirm } from "@/store/confirmStore";
 
 export default function AddAssetScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -53,14 +53,13 @@ export default function AddAssetScreen() {
 
   const handleDelete = () => {
     if (!existing) return;
-    Alert.alert("Delete asset", `Remove "${existing.name}"? This can't be undone.`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => { removeAsset(existing.id); toast.success("Asset deleted."); router.back(); },
-      },
-    ]);
+    confirm({
+      title: "Delete asset",
+      message: `Remove "${existing.name}"? This can't be undone.`,
+      confirmText: "Delete",
+      destructive: true,
+      onConfirm: () => { removeAsset(existing.id); toast.success("Asset deleted."); router.back(); },
+    });
   };
 
   return (

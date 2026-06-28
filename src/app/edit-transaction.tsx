@@ -12,7 +12,6 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,6 +24,7 @@ import { useAccountStore, accountLabel } from "@/store/accountStore";
 import { Chip } from "@/components/ui/Chip";
 import { TX_TYPES, TX_TYPE_COLORS, CATEGORIES, type TxType } from "@/constants/categories";
 import { toast } from "@/store/toastStore";
+import { confirm } from "@/store/confirmStore";
 
 export default function EditTransactionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -86,14 +86,13 @@ export default function EditTransactionScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert("Delete transaction", "Remove this transaction? This can't be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => { remove(tx.id); toast.success("Transaction deleted."); router.dismissAll(); },
-      },
-    ]);
+    confirm({
+      title: "Delete transaction",
+      message: "Remove this transaction? This can't be undone.",
+      confirmText: "Delete",
+      destructive: true,
+      onConfirm: () => { remove(tx.id); toast.success("Transaction deleted."); router.dismissAll(); },
+    });
   };
 
   return (

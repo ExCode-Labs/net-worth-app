@@ -3,13 +3,14 @@
  * (required) plus optional device biometrics. Reachable from Profile → Security.
  */
 import React, { useCallback, useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, Switch, Alert } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Switch } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { biometricsAvailable, inspectBiometrics, authenticate } from "@/services/biometrics";
 import { useSecurityStore } from "@/store/securityStore";
 import { toast } from "@/store/toastStore";
+import { confirm } from "@/store/confirmStore";
 import PinPad from "@/components/security/PinPad";
 
 type SetStep = null | "enter" | "confirm";
@@ -68,18 +69,13 @@ export default function SecurityScreen() {
     if (on) {
       openSetPin(true);            // need a PIN before lock can be on
     } else {
-      Alert.alert(
-        "Turn off app lock?",
-        "This removes your PIN and biometric unlock.",
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Turn off",
-            style: "destructive",
-            onPress: async () => { await setAppLock(false); toast.success("App lock disabled."); },
-          },
-        ],
-      );
+      confirm({
+        title: "Turn off app lock?",
+        message: "This removes your PIN and biometric unlock.",
+        confirmText: "Turn off",
+        destructive: true,
+        onConfirm: () => { void setAppLock(false).then(() => toast.success("App lock disabled.")); },
+      });
     }
   };
 

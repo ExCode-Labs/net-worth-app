@@ -5,7 +5,7 @@
  * drops out of net-worth totals. Edit reuses the shared Add Asset form.
  */
 import React, { useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -14,6 +14,7 @@ import { useTransactionStore } from "@/store/transactionStore";
 import { SettleSheet, accountRefLabel, txnRefLabel } from "@/components/ui/LedgerLink";
 import { fmt } from "@/utils/formatters";
 import { toast } from "@/store/toastStore";
+import { confirm } from "@/store/confirmStore";
 import { ASSET_TYPES, assetSubtitle } from "../assets";
 
 /** Labelled breakdown rows from an asset's type-specific details. */
@@ -75,11 +76,13 @@ export default function AssetDetailScreen() {
   if (asset.closed && d.toTxnId) rows.push({ label: isLent ? "Return txn" : "Proceeds txn", value: txnRefLabel(transactions.find((t) => t.id === d.toTxnId)) });
 
   const handleDelete = () => {
-    Alert.alert("Delete asset", `Remove "${asset.name}"? This can't be undone.`, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive",
-        onPress: () => { removeAsset(asset.id); toast.success("Asset deleted."); router.back(); } },
-    ]);
+    confirm({
+      title: "Delete asset",
+      message: `Remove "${asset.name}"? This can't be undone.`,
+      confirmText: "Delete",
+      destructive: true,
+      onConfirm: () => { removeAsset(asset.id); toast.success("Asset deleted."); router.back(); },
+    });
   };
 
   const handleClose = () => {

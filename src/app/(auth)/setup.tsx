@@ -418,7 +418,7 @@ export default function SetupScreen() {
         {/* ── Bottom bar: dots + CTA ───────────────────────────── */}
         <Animated.View
           entering={FadeIn.duration(400)}
-          className="px-xl pt-3 pb-2 gap-[10px] mt-auto"
+          className="px-xl pt-3 gap-[10px] mt-auto"
           style={{
             borderTopWidth: 1,
             borderTopColor: "rgba(255,255,255,0.06)",
@@ -440,7 +440,7 @@ export default function SetupScreen() {
           {step < TOTAL && (
             <TouchableOpacity
               onPress={handleSkipStep}
-              className="items-center py-2"
+              className="items-center py-1.5"
             >
               <Text className="text-sm text-dim font-semibold">
                 {skipStepLabel}
