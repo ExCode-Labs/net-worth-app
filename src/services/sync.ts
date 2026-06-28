@@ -32,15 +32,14 @@ function localIsEmpty(): boolean {
   );
 }
 
-function hydrateFromBootstrap(b: Bootstrap) {
-  useAccountStore.setState({
-    currency: b.me.currency ?? "INR",
-    accounts: b.accounts ?? [],
-    assets: b.assets ?? [],
-  });
-  useCardStore.setState({ cards: b.cards ?? [] });
-  useLiabilityStore.setState({ liabilities: b.liabilities ?? [] });
-  useTransactionStore.setState({ transactions: b.transactions ?? [] });
+/**
+ * Apply the server profile (identity) to the local store. Safe to run on every
+ * sync — it's server-authoritative and independent of local financial data, so
+ * returning users (who skip the entity hydrate below) still get their name,
+ * email and avatar populated.
+ */
+function hydrateProfile(b: Bootstrap) {
+  useAccountStore.setState({ currency: b.me.currency ?? "INR" });
   if (b.me.guestName) useUserStore.setState({ guestName: b.me.guestName });
   if (b.me.phone) useUserStore.setState({ phone: b.me.phone });
   useUserStore.getState().setProfile({
@@ -50,6 +49,17 @@ function hydrateFromBootstrap(b: Bootstrap) {
     email:     b.me.email,
     avatarUrl: b.me.avatarUrl,
   });
+}
+
+function hydrateFromBootstrap(b: Bootstrap) {
+  hydrateProfile(b);
+  useAccountStore.setState({
+    accounts: b.accounts ?? [],
+    assets: b.assets ?? [],
+  });
+  useCardStore.setState({ cards: b.cards ?? [] });
+  useLiabilityStore.setState({ liabilities: b.liabilities ?? [] });
+  useTransactionStore.setState({ transactions: b.transactions ?? [] });
 }
 
 /**
@@ -93,6 +103,7 @@ export async function startSync(): Promise<void> {
   try {
     const b = await withTimeout(fetchBootstrap(), 8000);
     if (b) {
+      hydrateProfile(b); // always — independent of local financial data
       if (localIsEmpty()) {
         hydrateFromBootstrap(b);
         await useAuthStore.getState().applyServerOnboarded(b.me.onboarded);
@@ -119,8 +130,11 @@ export async function resync(): Promise<void> {
   if (!apiEnabled) return;
   try {
     const b = await fetchBootstrap();
-    if (b && localIsEmpty()) hydrateFromBootstrap(b);
-    else reconcilePush();
+    if (b) {
+      hydrateProfile(b);
+      if (localIsEmpty()) hydrateFromBootstrap(b);
+      else reconcilePush();
+    }
   } catch {
     /* ignore */
   }

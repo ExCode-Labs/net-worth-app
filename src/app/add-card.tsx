@@ -95,10 +95,11 @@ export default function AddCardScreen() {
   const [cardName, setCardName]     = useState(existing?.cardName ?? "");
   const [bank, setBank]             = useState(existing?.bank ?? prefillBank ?? "");
   const [billCycle, setBillCycle]   = useState(existing?.billCycle ?? "");
-  // Seed the number field with the known last-4 from the linked transaction so
-  // it's visible/auto-filled. On save, last-4 is taken from the entered digits
-  // (or falls back to prefillLast4) — see handleSave.
-  const [number, setNumber]         = useState(groupCardNumber(existing?.number ?? prefillLast4 ?? ""));
+  // Keep the number field empty for a new card so the network can be detected
+  // from the BIN (leading digits) as the user types. Seeding the last-4 here
+  // would place it at the FRONT and break detection. The known last-4 is shown
+  // in the hint and applied on save (handleSave falls back to prefillLast4).
+  const [number, setNumber]         = useState(groupCardNumber(existing?.number ?? ""));
   const [cardHolder, setCardHolder] = useState(existing?.cardHolder ?? fullName);
   const [network, setNetwork]       = useState(existing?.network ?? "");
   const [expiry, setExpiry]         = useState(existing?.expiry ?? "");
@@ -241,7 +242,7 @@ export default function AddCardScreen() {
             </View>
 
             <LabeledInput f={{ label: "Bill Cycle Date", value: billCycle, set: setBillDay, placeholder: "e.g., 22", keyboardType: "number-pad", maxLength: 2, hint: "Statement day of the month (1–31)." }} />
-            <LabeledInput f={{ label: "Card Number", value: number, set: setNumberFmt, placeholder: "1234 5678 9012 3456", keyboardType: "number-pad", maxLength: 19, hint: prefillLast4 ? `Card ending ${prefillLast4} — links its transactions. Enter the full number if you have it (it ends in these 4), or keep just these 4 digits.` : "Network is detected automatically. Stored securely, shown only on your vault page." }} />
+            <LabeledInput f={{ label: "Card Number", value: number, set: setNumberFmt, placeholder: "1234 5678 9012 3456", keyboardType: "number-pad", maxLength: 19, hint: prefillLast4 ? `Linking the card ending ${prefillLast4}. Enter the full number to auto-detect the network — leave blank to keep just the last 4.` : "Network is detected automatically. Stored securely, shown only on your vault page." }} />
 
             <LabeledInput f={{ label: "Card Holder", value: cardHolder, set: setCardHolder, placeholder: "Name on card" }} />
 
