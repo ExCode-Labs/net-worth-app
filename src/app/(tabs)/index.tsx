@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -119,6 +119,9 @@ export default function HomeScreen() {
   const creditPct   = creditLimit > 0 ? Math.round((creditUsed / creditLimit) * 100) : 0;
 
   const expense = useMemo(() => buildMonthlyExpense(transactions), [transactions]);
+  // Which month bar is tapped in the mini chart (null = show the current month).
+  const [selExp, setSelExp] = useState<number | null>(null);
+  const shownExp = selExp != null ? expense.months[selExp] : expense.months[expense.months.length - 1];
   const recentTx = useMemo(
     () => transactions.filter((t) => t.status === "confirmed").slice(0, 4),
     [transactions],
@@ -255,8 +258,15 @@ export default function HomeScreen() {
             className="rounded-[18px] border border-white/[0.08] p-[18px]"
             style={{ backgroundColor: "rgba(255,255,255,0.05)" }}
           >
-            <View className="flex-row justify-between items-center mb-[14px]">
-              <Text className="text-xl font-bold text-white">Monthly Expense</Text>
+            <TouchableOpacity
+              onPress={() => router.push("/spending")}
+              activeOpacity={0.7}
+              className="flex-row justify-between items-center mb-[14px]"
+            >
+              <View className="flex-row items-center gap-1.5">
+                <Text className="text-xl font-bold text-white">Monthly Expense</Text>
+                <Ionicons name="chevron-forward" size={16} color="#6b7280" />
+              </View>
               {expense.changePct !== null && (
                 <View
                   className="flex-row items-center rounded-full px-2 py-[3px]"
@@ -275,11 +285,14 @@ export default function HomeScreen() {
                   </Text>
                 </View>
               )}
-            </View>
+            </TouchableOpacity>
             <Text style={{ fontSize: 28, fontWeight: "800", color: "#fff", marginBottom: 4 }}>
-              {fmt(expense.thisMonth)}
+              {fmt(shownExp.total)}
             </Text>
-            {expense.changePct !== null ? (
+            {/* Reads out the tapped month; falls back to the this-vs-last change. */}
+            {selExp != null ? (
+              <Text className="text-xs text-accent-purple mb-4 font-semibold">{shownExp.label} spending</Text>
+            ) : expense.changePct !== null ? (
               <Text
                 className="text-xs mb-4"
                 style={{ color: expense.changePct >= 0 ? "#f87171" : "#4ade80" }}
@@ -290,43 +303,44 @@ export default function HomeScreen() {
               <Text className="text-xs text-dim mb-4">No expenses recorded yet</Text>
             )}
 
-            <View className="flex-row items-end gap-2" style={{ height: 108 }}>
+            <View className="flex-row items-end gap-1" style={{ height: 100 }}>
               {expense.months.map((b, i) => {
                 const last = i === expense.months.length - 1;
+                const active = selExp === i;
                 const pct  = expense.max > 0 ? b.total / expense.max : 0;
+                // Solid purple for the selected bar (or the current month when
+                // nothing is selected); the rest recede. One hue, height = magnitude.
+                const highlight = active || (selExp == null && last);
                 return (
-                  <View key={b.key} className="flex-1 items-center gap-1.5">
-                    {/* Selective direct label — only the current month, never every bar */}
-                    <Text
-                      className="text-[9px] font-bold"
-                      style={{ color: "#a855f7", opacity: last && b.total > 0 ? 1 : 0 }}
-                      numberOfLines={1}
-                    >
-                      {fmtShort(b.total)}
-                    </Text>
-                    {/* Track + fill: magnitude is the height; the bar is one hue,
-                        with the current month solid to mark "now" (not magnitude). */}
+                  <TouchableOpacity
+                    key={b.key}
+                    onPress={() => setSelExp(active ? null : i)}
+                    activeOpacity={0.7}
+                    className="flex-1 items-center gap-1.5"
+                  >
+                    {/* Track + fill. The fill is a fixed, narrow width centred in the
+                        column so bars read as bars, not blocks. */}
                     <View
-                      className="w-full justify-end overflow-hidden rounded-t-[6px]"
-                      style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.05)" }}
+                      className="w-full justify-end items-center overflow-hidden rounded-t-[6px]"
+                      style={{ flex: 1, backgroundColor: active ? "rgba(168,85,247,0.08)" : "transparent" }}
                     >
                       <View
                         style={{
-                          width: "100%",
+                          width: 16,
                           height: `${Math.max(pct * 100, b.total > 0 ? 4 : 0)}%`,
-                          borderTopLeftRadius: 6,
-                          borderTopRightRadius: 6,
-                          backgroundColor: last ? "#a855f7" : "rgba(168,85,247,0.28)",
+                          borderTopLeftRadius: 5,
+                          borderTopRightRadius: 5,
+                          backgroundColor: highlight ? "#a855f7" : "rgba(168,85,247,0.28)",
                         }}
                       />
                     </View>
                     <Text
                       className="text-[9px] font-semibold"
-                      style={{ color: last ? "#a855f7" : "#4b5563" }}
+                      style={{ color: highlight ? "#a855f7" : "#4b5563" }}
                     >
                       {b.label}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>

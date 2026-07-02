@@ -34,7 +34,7 @@ const SECTIONS: {
     title: "Insights",
     items: [
       { icon: "bulb-outline",          label: "AI Insights",   sub: "Smart spending analysis",        accent: "#fbbf24", onPress: () => router.push("/ai-insights") },
-      { icon: "bar-chart-outline",     label: "Analytics",     sub: "Charts & spending reports",      accent: "#3b82f6" },
+      { icon: "bar-chart-outline",     label: "Analytics",     sub: "Charts & spending reports",      accent: "#3b82f6", onPress: () => router.push("/spending") },
       { icon: "flag-outline",          label: "Budget Goals",  sub: "Set & track monthly budgets",    accent: "#a855f7" },
     ],
   },
