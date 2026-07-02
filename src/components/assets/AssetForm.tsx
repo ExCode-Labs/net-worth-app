@@ -27,6 +27,7 @@ import { toast } from "@/store/toastStore";
 import { fetchGoldRatePerGram, fetchMfNav } from "@/services/rates";
 import { fdMaturity, rdMaturity } from "@/utils/maturity";
 import { fmt } from "@/utils/formatters";
+import { useAmountVisibilitySync } from "@/store/prefsStore";
 import { ASSET_TYPES } from "@/app/assets";
 
 export interface AssetDraft {
@@ -168,6 +169,7 @@ export default function AssetForm({
   draft: AssetDraft;
   onChange: (d: AssetDraft) => void;
 }) {
+  useAmountVisibilitySync();
   const [rateLoading, setRateLoading] = useState(false);
   const goldInFlight = useRef(false);
 

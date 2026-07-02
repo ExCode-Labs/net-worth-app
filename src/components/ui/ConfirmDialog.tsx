@@ -106,31 +106,29 @@ export function ConfirmDialog() {
             <View style={{ height: 12 }} />
           )}
 
-          <View style={{ flexDirection: "row", gap: 14 }}>
-            {/* Secondary — outline */}
+          {/* Cancel sits apart on the left as a quiet text button; the main
+              action is a prominent solid pill pushed to the opposite side so
+              it's unmistakable and hard to hit by accident. */}
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 }}>
+            {/* Secondary — quiet text button */}
             <Pressable
               onPress={dismiss}
+              hitSlop={8}
               style={({ pressed }) => ({
-                flex: 1,
-                paddingVertical: 14,
-                borderRadius: 14,
-                alignItems: "center",
-                justifyContent: "center",
-                borderWidth: 1.5,
-                borderColor: "rgba(255,255,255,0.18)",
-                backgroundColor: "transparent",
-                opacity: pressed ? 0.6 : 1,
+                paddingVertical: 12,
+                paddingHorizontal: 10,
+                opacity: pressed ? 0.55 : 1,
               })}
             >
-              <Text style={{ fontSize: 15, fontWeight: "600", color: "#e5e7eb" }}>{cancelText}</Text>
+              <Text style={{ fontSize: 15, fontWeight: "600", color: "#9ca3af" }}>{cancelText}</Text>
             </Pressable>
-            {/* Primary — solid accent (red for destructive) */}
+            {/* Primary — solid accent pill (red for destructive) */}
             <Pressable
               onPress={accept}
               style={({ pressed }) => ({
-                flex: 1,
-                paddingVertical: 14,
-                borderRadius: 14,
+                paddingVertical: 13,
+                paddingHorizontal: 28,
+                borderRadius: 13,
                 alignItems: "center",
                 justifyContent: "center",
                 backgroundColor: accent,

@@ -30,7 +30,7 @@ const EMPTY: AccountForm = {
   accountNumber: "",
   ifsc: "",
   branch: "",
-  balance: "",
+  balance: "0",
 };
 
 export default function AddAccountScreen() {

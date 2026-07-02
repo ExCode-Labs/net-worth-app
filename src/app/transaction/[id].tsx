@@ -15,6 +15,7 @@ import { TX_TYPE_COLORS } from "@/constants/categories";
 import { fmt } from "@/utils/formatters";
 import { toast } from "@/store/toastStore";
 import { confirm } from "@/store/confirmStore";
+import { useAmountVisibilitySync } from "@/store/prefsStore";
 
 const ICON: Record<string, React.ComponentProps<typeof Ionicons>["name"]> = {
   Expense:  "arrow-up-circle",
@@ -23,6 +24,7 @@ const ICON: Record<string, React.ComponentProps<typeof Ionicons>["name"]> = {
 };
 
 export default function TransactionDetailScreen() {
+  useAmountVisibilitySync();
   const { id } = useLocalSearchParams<{ id: string }>();
   const tx       = useTransactionStore((s) => s.transactions.find((t) => t.id === id));
   const remove   = useTransactionStore((s) => s.removeTransaction);

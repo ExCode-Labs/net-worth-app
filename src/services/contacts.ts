@@ -23,10 +23,16 @@ export interface PickedContact {
  *  unavailable. The native picker handles its own permission prompt. */
 export async function pickContact(): Promise<PickedContact | null> {
   if (!contacts) return null;
-  const c = await contacts.presentContactPickerAsync();
+  const c = await contacts.Contact.presentPicker();
   if (!c) return null;
+  const [givenName, familyName, phones] = await Promise.all([
+    c.getGivenName(),
+    c.getFamilyName(),
+    c.getPhones(),
+  ]);
+  const name = [givenName, familyName].filter(Boolean).join(" ").trim() || "";
   return {
-    name: c.name?.trim() ?? "",
-    phone: c.phoneNumbers?.[0]?.number?.trim() ?? "",
+    name,
+    phone: phones?.[0]?.number?.trim() ?? "",
   };
 }

@@ -15,6 +15,9 @@ export function dayKey(d: Date): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
+/** Fixed height for every day cell — the key to keeping all rows aligned. */
+const CELL_H = 50;
+
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -41,16 +44,23 @@ export default function MonthCalendar({
   const todayKey = dayKey(new Date());
   const selKey = selected ? dayKey(selected) : null;
 
-  // Build the grid: leading blanks for the weekday offset, then each day.
-  const cells = useMemo(() => {
+  // Build the grid as actual week-rows (not a flat flex-wrap list): 7 cells
+  // per row, each flex:1. A flat list with `width: 100/7 + "%"` per cell — a
+  // repeating decimal — accumulates floating-point rounding error across the
+  // row, so the 7th cell's total width occasionally exceeds the container and
+  // wraps onto the next line, leaving the last column looking empty. Explicit
+  // rows sidestep that: no wrap, no fractional-percent rounding to accumulate.
+  const weeks = useMemo(() => {
     const year = month.getFullYear();
     const m = month.getMonth();
     const firstDow = new Date(year, m, 1).getDay();
     const days = new Date(year, m + 1, 0).getDate();
-    const out: (Date | null)[] = [];
-    for (let i = 0; i < firstDow; i++) out.push(null);
-    for (let d = 1; d <= days; d++) out.push(new Date(year, m, d));
-    while (out.length % 7 !== 0) out.push(null);
+    const cells: (Date | null)[] = [];
+    for (let i = 0; i < firstDow; i++) cells.push(null);
+    for (let d = 1; d <= days; d++) cells.push(new Date(year, m, d));
+    while (cells.length % 7 !== 0) cells.push(null);
+    const out: (Date | null)[][] = [];
+    for (let i = 0; i < cells.length; i += 7) out.push(cells.slice(i, i + 7));
     return out;
   }, [month]);
 
@@ -79,47 +89,51 @@ export default function MonthCalendar({
         ))}
       </View>
 
-      {/* Day grid */}
-      <View className="flex-row flex-wrap">
-        {cells.map((d, i) => {
-          if (!d) return <View key={i} style={{ width: `${100 / 7}%`, aspectRatio: 1.1 }} />;
-          const k = dayKey(d);
-          const t = totals.get(k);
-          const isToday = k === todayKey;
-          const isSel = k === selKey;
-          return (
-            <TouchableOpacity
-              key={i}
-              onPress={() => onSelectDay(d)}
-              activeOpacity={0.7}
-              style={{ width: `${100 / 7}%`, aspectRatio: t ? 0.78 : 1.1, padding: 2 }}
-            >
-              <View
-                className="flex-1 rounded-[9px] items-center pt-1"
-                style={{
-                  overflow: "hidden",
-                  backgroundColor: isSel ? "rgba(168,85,247,0.22)" : "transparent",
-                  borderWidth: isSel ? 1 : isToday ? 1 : 0,
-                  borderColor: isSel ? "#a855f7" : isToday ? "rgba(255,255,255,0.18)" : "transparent",
-                }}
-              >
-                <Text className="text-[12px] font-semibold" style={{ color: isToday || isSel ? "#fff" : "#cbd5e1" }}>
-                  {d.getDate()}
-                </Text>
-                {t ? (
-                  <View style={{ marginTop: 1, width: "100%", alignItems: "center" }}>
-                    {t.income > 0 ? (
-                      <Text className="text-[8px] font-bold" style={{ color: "#4ade80" }} numberOfLines={1}>+{tiny(t.income)}</Text>
-                    ) : null}
-                    {t.expense > 0 ? (
-                      <Text className="text-[8px] font-bold" style={{ color: "#f87171" }} numberOfLines={1}>-{tiny(t.expense)}</Text>
-                    ) : null}
-                  </View>
-                ) : null}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+      {/* Day grid — one row per week, 7 flex:1 cells each, fixed height so
+          rows stay aligned whether or not a day has income/expense totals. */}
+      <View>
+        {weeks.map((week, wi) => (
+          <View key={wi} className="flex-row">
+            {week.map((d, i) => {
+              if (!d) return <View key={i} style={{ flex: 1, height: CELL_H }} />;
+              const k = dayKey(d);
+              const t = totals.get(k);
+              const isToday = k === todayKey;
+              const isSel = k === selKey;
+              return (
+                <View key={i} style={{ flex: 1, height: CELL_H, padding: 2 }}>
+                  <TouchableOpacity
+                    onPress={() => onSelectDay(d)}
+                    activeOpacity={0.7}
+                    className="flex-1 rounded-[10px] items-center pt-[3px]"
+                    style={{
+                      overflow: "hidden",
+                      backgroundColor: isSel
+                        ? "rgba(168,85,247,0.22)"
+                        : t
+                          ? "rgba(255,255,255,0.035)"
+                          : "transparent",
+                      borderWidth: isSel || isToday ? 1 : 0,
+                      borderColor: isSel ? "#a855f7" : isToday ? "rgba(255,255,255,0.18)" : "transparent",
+                    }}
+                  >
+                    <Text className="text-[12px] font-semibold" style={{ color: isToday || isSel ? "#fff" : "#cbd5e1" }}>
+                      {d.getDate()}
+                    </Text>
+                    <View style={{ marginTop: 1, width: "100%", alignItems: "center" }}>
+                      {t?.income ? (
+                        <Text className="text-[8px] font-bold" style={{ color: "#4ade80" }} numberOfLines={1}>+{tiny(t.income)}</Text>
+                      ) : null}
+                      {t?.expense ? (
+                        <Text className="text-[8px] font-bold" style={{ color: "#f87171" }} numberOfLines={1}>-{tiny(t.expense)}</Text>
+                      ) : null}
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </View>
+        ))}
       </View>
     </View>
   );

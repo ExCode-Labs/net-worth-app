@@ -15,6 +15,7 @@ import { startSync, stopSync, resync } from "@/services/sync";
 import { useSecurityStore } from "@/store/securityStore";
 import { useBankStore } from "@/store/bankStore";
 import { useCardProductStore } from "@/store/cardProductStore";
+import { useCurrencyStore } from "@/store/currencyStore";
 import LockScreen from "@/components/security/LockScreen";
 
 SplashScreen.preventAutoHideAsync();
@@ -92,6 +93,7 @@ function RouteGate() {
     useUserStore.getState().hydrateDeviceId();
     void useBankStore.getState().refresh();
     void useCardProductStore.getState().refresh();
+    void useCurrencyStore.getState().fetchRates();
   }, []);
 
   useEffect(() => {
@@ -154,11 +156,13 @@ function RouteGate() {
       <Stack.Screen name="transaction/[id]" />
       <Stack.Screen name="edit-transaction" />
       <Stack.Screen name="preferences" />
+      <Stack.Screen name="ai-insights" />
       <Stack.Screen name="security" />
       <Stack.Screen name="edit-profile" />
       <Stack.Screen name="sessions" />
       <Stack.Screen name="sharing" />
       <Stack.Screen name="share-select" />
+      <Stack.Screen name="share-config" />
       <Stack.Screen name="shared/[ownerId]" />
     </Stack>
   );

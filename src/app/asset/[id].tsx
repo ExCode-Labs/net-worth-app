@@ -15,6 +15,7 @@ import { SettleSheet, accountRefLabel, txnRefLabel } from "@/components/ui/Ledge
 import { fmt } from "@/utils/formatters";
 import { toast } from "@/store/toastStore";
 import { confirm } from "@/store/confirmStore";
+import { useAmountVisibilitySync } from "@/store/prefsStore";
 import { ASSET_TYPES, assetSubtitle } from "../assets";
 
 /** Labelled breakdown rows from an asset's type-specific details. */
@@ -44,6 +45,7 @@ function detailRows(a: Asset): { label: string; value: string }[] {
 }
 
 export default function AssetDetailScreen() {
+  useAmountVisibilitySync();
   const { id }      = useLocalSearchParams<{ id: string }>();
   const asset       = useAccountStore((s) => s.assets.find((a) => a.id === id));
   const accounts    = useAccountStore((s) => s.accounts);

@@ -81,23 +81,60 @@ function bankSuffix(raw: string): string {
   return m ? m[1].trim() : "Unknown";
 }
 
+/**
+ * Per-bank parsing rules, one entry per bank keyed by its canonical name.
+ * Everything that differs bank-to-bank lives here so adding or tweaking a bank
+ * is a single visible block — no hunting through the extractor functions.
+ *
+ *   detect       — body signature, used when the sender title is missing.
+ *                  Order matters: entries are tested top-to-bottom, specific
+ *                  before generic (e.g. "Airtel Payments Bank" before a bare
+ *                  bank word). Object key order is preserved.
+ *   counterparty — ordered regexes for who money went to / came from. Capture
+ *                  group 1 is the name. Tried before the generic fallbacks in
+ *                  extractCounterparty. Direction-specific layouts just list
+ *                  both variants (e.g. PNB "to … thru" and "by … thru").
+ *   creditCard   — extra signal that an alert from this bank is a credit-card
+ *                  one (OR-ed into the generic isCreditCard heuristics).
+ */
+interface BankRule {
+  detect?:       RegExp;
+  counterparty?: RegExp[];
+  creditCard?:   RegExp;
+}
+
+const BANK_RULES: Record<string, BankRule> = {
+  "Airtel Payments Bank": { detect: /airtel\s*payments\s*bank/i },
+  "Jio Payments Bank":    { detect: /\bJPBL\b/i,
+    counterparty: [/UPI\/(?:DR|CR)\/\d+\/([^/]+?)(?:\s+Not\b|\/|$)/i] },        // UPI/DR/<rrn>/NAME
+  "Bihar Gramin Bank":    { detect: /\bBGB\b|bihar.*gramin/i },
+  "IndusInd Bank":        { detect: /indusind/i,
+    counterparty: [/Ref-[^:]*:\s*([A-Za-z][A-Za-z ]+)/i] },                     // "Closure Proceeds"
+  "SBM Bank India":       { detect: /sbm\s*(?:bank|novio)/i },
+  "Kotak Mahindra Bank":  { detect: /kotak/i },                                 // uses generic VPA
+  "HDFC Bank":            { detect: /hdfc/i },                                  // uses generic "At X On"
+  "ICICI Bank":           { detect: /icici/i },
+  "Axis Bank":            { detect: /\baxis\b/i,
+    counterparty: [/MOB\/TPFT\/([A-Za-z][A-Za-z .]+?)\//i] },                   // MOB/TPFT/NAME
+  "AU Small Finance Bank":{ detect: /\bAU\s*Bank\b/i,
+    counterparty: [/UPI\/(?:DR|CR)\/\d+\/([^/]+?)(?:\s+Not\b|\/|$)/i] },        // UPI/DR/<rrn>/NAME
+  "Punjab National Bank": { detect: /\bpnb\b|punjab\s*national/i,
+    counterparty: [
+      /\bto\s+([A-Za-z][A-Za-z .&]+?)\s+thru\b/i,                               // debit:  to NAME thru
+      /\bby\s+([A-Za-z][A-Za-z .&]+?)\s+thru\b/i,                               // credit: by NAME thru
+    ] },
+  "State Bank of India":  { detect: /\bsbi\b|state\s*bank/i,
+    counterparty: [
+      /\btrf\s+to\s+([A-Za-z][A-Za-z .]+?)\s+Ref/i,                             // debit
+      /\btransfer\s+from\s+([A-Za-z][A-Za-z .]+?)\s+Ref/i,                      // credit
+    ],
+    creditCard: /\bSBI\s+Card\b/i },                                            // SBI Cards & Payment Services
+};
+
 /** Body-signature bank detection, for alerts whose sender title we didn't get. */
-const KNOWN_BANKS: [RegExp, string][] = [
-  [/airtel\s*payments\s*bank/i, "Airtel Payments Bank"],
-  [/\bJPBL\b/i,                  "Jio Payments Bank"],
-  [/\bBGB\b|bihar.*gramin/i,     "Bihar Gramin Bank"],
-  [/indusind/i,                  "IndusInd Bank"],
-  [/sbm\s*(?:bank|novio)/i,      "SBM Bank India"],
-  [/kotak/i,                     "Kotak Mahindra Bank"],
-  [/hdfc/i,                      "HDFC Bank"],
-  [/icici/i,                     "ICICI Bank"],
-  [/\baxis\b/i,                  "Axis Bank"],
-  [/\bAU\s*Bank\b/i,             "AU Small Finance Bank"],
-  [/\bpnb\b|punjab\s*national/i, "Punjab National Bank"],
-  [/\bsbi\b|state\s*bank/i,      "State Bank of India"],
-];
 function detectKnownBank(raw: string): string | null {
-  for (const [re, name] of KNOWN_BANKS) if (re.test(raw)) return name;
+  for (const [name, rule] of Object.entries(BANK_RULES))
+    if (rule.detect?.test(raw)) return name;
   return null;
 }
 
@@ -209,40 +246,41 @@ function clean(s: string): string {
   return s.replace(/^UPI\//i, "").replace(/[\s.\-]+$/, "").replace(/\s{2,}/g, " ").trim();
 }
 
+/** Run an ordered list of counterparty regexes; first real (non-numeric) capture wins. */
+function tryCounterpartyRules(text: string, rules?: RegExp[]): string | null {
+  for (const re of rules ?? []) {
+    const m = text.match(re);
+    if (m?.[1] && !/^\d+$/.test(m[1].trim())) return clean(m[1]);
+  }
+  return null;
+}
+
 /**
- * Who the money went to / came from. Ordered most-specific first so each bank's
- * distinctive layout wins before the generic VPA/preposition fallbacks:
- *   UPI/DR|CR/<rrn>/NAME (Jio, AU) · trf to/transfer from NAME (SBI) ·
- *   to/by NAME thru (PNB) · MOB/TPFT/NAME (Axis) · VPA (Kotak, IndusInd) ·
- *   At MERCHANT On (HDFC debit card) · towards NAME · Ref-…: NAME (IndusInd) ·
- *   salary / reversal / cash-deposit purposes.
+ * Who the money went to / came from. The detected bank's own rules (BANK_RULES)
+ * win first; then every other bank's rules (covers mis-detection and layouts
+ * shared across banks, e.g. UPI/DR); then the bank-agnostic fallbacks below
+ * (VPA · "At MERCHANT On" · "towards NAME" · salary/reversal/cash-deposit).
  */
-function extractCounterparty(text: string, direction: TxnDirection): string {
-  let m = text.match(/UPI\/(?:DR|CR)\/\d+\/([^/]+?)(?:\s+Not\b|\/|$)/i);     // Jio, AU
-  if (m && !/^\d+$/.test(m[1].trim())) return clean(m[1]);
+function extractCounterparty(text: string, _direction: TxnDirection, bank: string): string {
+  // 1. Detected bank's own layout.
+  const own = tryCounterpartyRules(text, BANK_RULES[bank]?.counterparty);
+  if (own) return own;
 
-  m = text.match(/\btrf\s+to\s+([A-Za-z][A-Za-z .]+?)\s+Ref/i);             // SBI debit
-  if (m) return clean(m[1]);
-  m = text.match(/\btransfer\s+from\s+([A-Za-z][A-Za-z .]+?)\s+Ref/i);      // SBI credit
-  if (m) return clean(m[1]);
+  // 2. Any other bank's layout (mis-detection / shared formats).
+  for (const [name, rule] of Object.entries(BANK_RULES)) {
+    if (name === bank) continue;
+    const hit = tryCounterpartyRules(text, rule.counterparty);
+    if (hit) return hit;
+  }
 
-  const prep = direction === "credit" ? "by" : "to";
-  m = text.match(new RegExp(`\\b${prep}\\s+([A-Za-z][A-Za-z .&]+?)\\s+thru\\b`, "i")); // PNB
-  if (m) return clean(m[1]);
-
-  m = text.match(/MOB\/TPFT\/([A-Za-z][A-Za-z .]+?)\//i);                   // Axis
-  if (m) return clean(m[1]);
-
+  // 3. Bank-agnostic fallbacks.
   const vpa = extractVpa(text);                                            // Kotak, IndusInd, "towards <vpa>"
   if (vpa) return vpa;
 
-  m = text.match(/\bat\s+(.+?)\s+on\b/i);                                   // HDFC debit-card "At X On"
+  let m = text.match(/\bat\s+(.+?)\s+on\b/i);                              // HDFC debit-card "At X On"
   if (m) return clean(m[1]);
 
-  m = text.match(/\btowards\s+([A-Za-z][A-Za-z .]+?)(?:\s+on\b|\.|$)/i);    // PNB charges
-  if (m) return clean(m[1]);
-
-  m = text.match(/Ref-[^:]*:\s*([A-Za-z][A-Za-z ]+)/i);                     // IndusInd "Closure Proceeds"
+  m = text.match(/\btowards\s+([A-Za-z][A-Za-z .]+?)(?:\s+on\b|\.|$)/i);   // charges
   if (m) return clean(m[1]);
 
   if (/\bsal(?:ary)?\s+credit\b/i.test(text)) return "Salary";
@@ -267,11 +305,12 @@ function isCreditCard(text: string): boolean {
     /credited to your card ending/i.test(text) ||
     /adjusted against .*card/i.test(text) ||
     // Indian banks that skip the "credit card" phrase in some notification templates:
-    /\bSBI\s+Card\b/i.test(text) ||                           // SBI Cards & Payment Services
     /\bavl(?:ailable)?\s+(?:cr(?:edit)?\s+)?limit\b/i.test(text) || // "Avl Limit" / "available credit limit"
     /\bcredit\s+limit\b/i.test(text) ||                       // "credit limit" is exclusive to CC alerts
     /\bmin(?:imum)?\s+(?:amount\s+)?due\b/i.test(text) ||    // "minimum due" on billing statement SMSes
-    /\btotal\s+(?:amount\s+)?due\b/i.test(text)              // "total due" on billing statement SMSes
+    /\btotal\s+(?:amount\s+)?due\b/i.test(text) ||           // "total due" on billing statement SMSes
+    // Per-bank credit-card signals from BANK_RULES (e.g. SBI "SBI Card").
+    Object.values(BANK_RULES).some((r) => r.creditCard?.test(text))
   );
 }
 
@@ -293,7 +332,7 @@ export function parseBankMessage(
   const bank         = detectBank(text, senderTitle);
   if (bank === "Unknown" && !accountLast4) return null; // nothing to anchor on
 
-  const counterparty = extractCounterparty(text, direction);
+  const counterparty = extractCounterparty(text, direction, bank);
 
   return {
     bank,

@@ -2,9 +2,9 @@
  * Vault — reveals full stored secrets (card numbers, account numbers, IFSC,
  * holder names). Everywhere else in the app these are masked to the last 4.
  *
- * Protection: gated by a 4-digit vault PIN stored as SHA-256 hash in the DB
+ * Protection: gated by a 6-digit vault PIN stored as SHA-256 hash in the DB
  * (persists across reinstalls). First open prompts creation; subsequent opens
- * prompt entry. Forgot PIN → OTP reset via registered email.
+ * prompt entry. Change PIN: verify current → set new. Forgot PIN → OTP reset.
  *
  * CVV is never stored, so it never appears here.
  */
@@ -27,6 +27,7 @@ import {
 } from "@/store/cardStore";
 import { useUserStore } from "@/store/userStore";
 import { toast } from "@/store/toastStore";
+import { confirm } from "@/store/confirmStore";
 import {
   setupVaultPin,
   verifyVaultPin,
@@ -36,6 +37,8 @@ import {
 import { fetchVaultData, type VaultData } from "@/services/backend";
 import { apiError } from "@/utils/apiError";
 import PinPad from "@/components/security/PinPad";
+
+const PIN_LEN = 6;
 
 // ── A single revealable secret row ──────────────────────────────────────────
 function SecretRow({ label, masked, full }: { label: string; masked: string; full: string }) {
@@ -92,13 +95,18 @@ type VaultState =
   | "setup-enter"
   | "setup-confirm"
   | "unlock"
-  | "reset-send"      // waiting user to tap "Send OTP"
-  | "reset-verify"    // OTP + new PIN entry
+  | "change-verify"   // verify current PIN before changing
+  | "change-new"      // enter new PIN
+  | "change-confirm"  // confirm new PIN
+  | "reset-send"
+  | "reset-verify"
   | "open";
 
 export default function VaultScreen() {
-  const accounts = useAccountStore((s) => s.accounts);
-  const cards    = useCardStore((s) => s.cards);
+  const accounts       = useAccountStore((s) => s.accounts);
+  const removeAccount  = useAccountStore((s) => s.removeAccount);
+  const cards          = useCardStore((s) => s.cards);
+  const removeCard     = useCardStore((s) => s.removeCard);
   const { hasVaultPin, email } = useUserStore();
 
   const [vaultState, setVaultState] = useState<VaultState>(hasVaultPin ? "unlock" : "setup-enter");
@@ -106,6 +114,7 @@ export default function VaultScreen() {
   const [firstPin, setFirst] = useState("");
   const [error, setError]   = useState<string | null>(null);
   const [vaultData, setVaultData] = useState<VaultData | null>(null);
+  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
 
   // Reset flow
   const [otp, setOtp]         = useState("");
@@ -151,11 +160,18 @@ export default function VaultScreen() {
   // ── Unlock: verify PIN ──────────────────────────────────────────────────────
   const onUnlockComplete = useCallback(async (entered: string) => {
     try {
-      const ok = await verifyVaultPin(entered);
-      if (ok) {
+      const result = await verifyVaultPin(entered);
+      if (result.ok) {
+        setLockedUntil(null);
         openVault();
+      } else if (result.lockedUntil) {
+        setLockedUntil(result.lockedUntil);
+        setPin("");
       } else {
-        setError("Incorrect PIN. Try again.");
+        const left = result.attemptsLeft;
+        setError(left === 1
+          ? "Incorrect PIN. 1 attempt left before 24h lockout."
+          : `Incorrect PIN. ${left} attempt${left !== 1 ? "s" : ""} left.`);
         setPin("");
       }
     } catch (e) {
@@ -163,6 +179,57 @@ export default function VaultScreen() {
       setPin("");
     }
   }, [openVault]);
+
+  // ── Change PIN flow ─────────────────────────────────────────────────────────
+  const onChangeVerify = useCallback(async (entered: string) => {
+    try {
+      const result = await verifyVaultPin(entered);
+      if (result.ok) {
+        setLockedUntil(null);
+        clearPin();
+        setVaultState("change-new");
+      } else if (result.lockedUntil) {
+        setLockedUntil(result.lockedUntil);
+        setPin("");
+      } else {
+        const left = result.attemptsLeft;
+        setError(left === 1
+          ? "Incorrect PIN. 1 attempt left before 24h lockout."
+          : `Incorrect PIN. ${left} attempt${left !== 1 ? "s" : ""} left.`);
+        setPin("");
+      }
+    } catch (e) {
+      setError(apiError(e, "Could not verify. Check your connection."));
+      setPin("");
+    }
+  }, []);
+
+  const onChangeNew = useCallback((entered: string) => {
+    setFirst(entered);
+    clearPin();
+    setVaultState("change-confirm");
+  }, []);
+
+  const onChangeConfirm = useCallback(async (entered: string) => {
+    if (entered !== firstPin) {
+      setError("PINs don't match. Try again.");
+      clearPin();
+      setVaultState("change-new");
+      setFirst("");
+      return;
+    }
+    try {
+      await setupVaultPin(entered);
+      toast.success("Vault PIN changed.");
+      clearPin();
+      setFirst("");
+      setVaultState("open");
+    } catch (e) {
+      toast.error(apiError(e, "Failed to save new PIN."));
+      clearPin();
+      setVaultState("change-new");
+    }
+  }, [firstPin]);
 
   // ── Reset flow ──────────────────────────────────────────────────────────────
   const handleSendOtp = async () => {
@@ -176,9 +243,9 @@ export default function VaultScreen() {
   };
 
   const handleResetVerify = async () => {
-    if (newPin.length < 4) { toast.error("PIN must be at least 4 digits."); return; }
-    if (newPin !== newPinC)  { toast.error("PINs don't match."); return; }
-    if (otp.length !== 6)    { toast.error("OTP must be 6 digits."); return; }
+    if (newPin.length < PIN_LEN) { toast.error(`PIN must be ${PIN_LEN} digits.`); return; }
+    if (newPin !== newPinC)       { toast.error("PINs don't match."); return; }
+    if (otp.length !== 6)         { toast.error("OTP must be 6 digits."); return; }
     try {
       await resetVaultPin(otp, newPin);
       useUserStore.setState({ hasVaultPin: true });
@@ -189,10 +256,9 @@ export default function VaultScreen() {
     }
   };
 
-  // ── Common back button in header ────────────────────────────────────────────
   const headerBack = () => router.back();
 
-  // ── PIN gate screens ────────────────────────────────────────────────────────
+  // ── Setup screens ────────────────────────────────────────────────────────────
   if (vaultState === "setup-enter" || vaultState === "setup-confirm") {
     return (
       <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-cosmic-darker">
@@ -212,11 +278,11 @@ export default function VaultScreen() {
           <PinPad
             value={pin}
             onChange={(v) => { if (error) setError(null); setPin(v); }}
-            length={4}
+            length={PIN_LEN}
             title={vaultState === "setup-enter" ? "Create Vault PIN" : "Confirm Vault PIN"}
             subtitle={
               vaultState === "setup-enter"
-                ? "Choose a 4-digit PIN to protect your vault"
+                ? `Choose a ${PIN_LEN}-digit PIN to protect your vault`
                 : "Re-enter your chosen PIN"
             }
             error={error}
@@ -227,6 +293,46 @@ export default function VaultScreen() {
     );
   }
 
+  // ── Lockout screen ───────────────────────────────────────────────────────────
+  if ((vaultState === "unlock" || vaultState === "change-verify") && lockedUntil && lockedUntil > Date.now()) {
+    const remainingMs = lockedUntil - Date.now();
+    const hours = Math.ceil(remainingMs / (60 * 60 * 1000));
+    return (
+      <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-cosmic-darker">
+        <View className="flex-row items-center px-xl pt-3 pb-2">
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="w-[38px] h-[38px] rounded-[11px] border border-white/[0.08] items-center justify-center"
+            style={{ backgroundColor: "rgba(255,255,255,0.05)" }}
+          >
+            <Ionicons name="chevron-back" size={22} color="#9ca3af" />
+          </TouchableOpacity>
+        </View>
+        <View className="flex-1 items-center justify-center px-xl gap-5">
+          <View
+            className="w-16 h-16 rounded-2xl items-center justify-center border border-accent-red/30"
+            style={{ backgroundColor: "rgba(248,113,113,0.12)" }}
+          >
+            <Ionicons name="lock-closed" size={30} color="#f87171" />
+          </View>
+          <Text className="text-xl font-bold text-white text-center">Vault Locked</Text>
+          <Text className="text-sm text-muted text-center" style={{ lineHeight: 20 }}>
+            Too many incorrect attempts. Your vault is locked for approximately {hours} hour{hours !== 1 ? "s" : ""}.
+          </Text>
+          {email && (
+            <TouchableOpacity
+              onPress={() => { setLockedUntil(null); setVaultState("reset-send"); }}
+              className="mt-2"
+            >
+              <Text className="text-accent-purple font-semibold text-base">Reset PIN via email →</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Unlock screen ────────────────────────────────────────────────────────────
   if (vaultState === "unlock") {
     return (
       <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-cosmic-darker">
@@ -248,7 +354,7 @@ export default function VaultScreen() {
           <PinPad
             value={pin}
             onChange={(v) => { if (error) setError(null); setPin(v); }}
-            length={4}
+            length={PIN_LEN}
             title="Enter Vault PIN"
             subtitle="Unlock to access your full card and account details"
             error={error}
@@ -259,6 +365,53 @@ export default function VaultScreen() {
     );
   }
 
+  // ── Change PIN screens ───────────────────────────────────────────────────────
+  if (vaultState === "change-verify" || vaultState === "change-new" || vaultState === "change-confirm") {
+    const titles = {
+      "change-verify":  "Enter Current PIN",
+      "change-new":     "Enter New PIN",
+      "change-confirm": "Confirm New PIN",
+    };
+    const subtitles = {
+      "change-verify":  "Verify your identity before changing",
+      "change-new":     `Choose a new ${PIN_LEN}-digit PIN`,
+      "change-confirm": "Re-enter your new PIN",
+    };
+    const completeFns = {
+      "change-verify":  onChangeVerify,
+      "change-new":     onChangeNew,
+      "change-confirm": onChangeConfirm,
+    };
+    return (
+      <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-cosmic-darker">
+        <View className="flex-row items-center px-xl pt-3 pb-2">
+          <TouchableOpacity
+            onPress={() => {
+              clearPin(); setFirst("");
+              setVaultState(vaultState === "change-verify" ? "open" : "change-verify");
+            }}
+            className="w-[38px] h-[38px] rounded-[11px] border border-white/[0.08] items-center justify-center"
+            style={{ backgroundColor: "rgba(255,255,255,0.05)" }}
+          >
+            <Ionicons name="chevron-back" size={22} color="#9ca3af" />
+          </TouchableOpacity>
+        </View>
+        <View className="flex-1 items-center justify-center">
+          <PinPad
+            value={pin}
+            onChange={(v) => { if (error) setError(null); setPin(v); }}
+            length={PIN_LEN}
+            title={titles[vaultState]}
+            subtitle={subtitles[vaultState]}
+            error={error}
+            onComplete={completeFns[vaultState]}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Forgot PIN screens ───────────────────────────────────────────────────────
   if (vaultState === "reset-send") {
     return (
       <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-cosmic-darker">
@@ -309,7 +462,7 @@ export default function VaultScreen() {
         <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
           <Text className="text-xl font-bold text-white mb-1 mt-4">Enter reset code</Text>
           <Text className="text-sm text-muted mb-6" style={{ lineHeight: 20 }}>
-            Check your email for the 6-digit code, then choose a new vault PIN.
+            Check your email for the 6-digit code, then choose a new {PIN_LEN}-digit vault PIN.
           </Text>
 
           <Text className="text-xs text-dim uppercase tracking-widest mb-2">OTP Code</Text>
@@ -329,9 +482,9 @@ export default function VaultScreen() {
             value={newPin}
             onChangeText={setNewPin}
             keyboardType="number-pad"
-            maxLength={6}
+            maxLength={PIN_LEN}
             secureTextEntry
-            placeholder="4–6 digits"
+            placeholder={`${PIN_LEN} digits`}
             placeholderTextColor="#4b5563"
             className="rounded-xl border border-white/[0.08] px-4 py-3 text-white text-lg tracking-widest mb-3"
             style={{ backgroundColor: "rgba(255,255,255,0.05)" }}
@@ -342,7 +495,7 @@ export default function VaultScreen() {
             value={newPinC}
             onChangeText={setNewPinC}
             keyboardType="number-pad"
-            maxLength={6}
+            maxLength={PIN_LEN}
             secureTextEntry
             placeholder="Re-enter new PIN"
             placeholderTextColor="#4b5563"
@@ -363,9 +516,29 @@ export default function VaultScreen() {
     );
   }
 
-  // ── Vault content ───────────────────────────────────────────────────────────
+  // ── Vault content ────────────────────────────────────────────────────────────
   const creditCards = cards.filter((c) => c.type !== "debit");
   const isEmpty = accounts.length === 0 && creditCards.length === 0;
+
+  const deleteAccount = (id: string, name: string) => {
+    confirm({
+      title: "Delete account",
+      message: `Remove "${name}"? This can't be undone.`,
+      confirmText: "Delete",
+      destructive: true,
+      onConfirm: () => { removeAccount(id); toast.success("Account deleted."); },
+    });
+  };
+
+  const deleteCard = (id: string, name: string) => {
+    confirm({
+      title: "Delete card",
+      message: `Remove "${name}"? This can't be undone.`,
+      confirmText: "Delete",
+      destructive: true,
+      onConfirm: () => { removeCard(id); toast.success("Card deleted."); },
+    });
+  };
 
   return (
     <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-cosmic-darker">
@@ -380,14 +553,24 @@ export default function VaultScreen() {
           <Ionicons name="chevron-back" size={22} color="#9ca3af" />
         </TouchableOpacity>
         <Text className="text-lg font-bold text-white">Vault</Text>
-        {/* Re-lock */}
-        <TouchableOpacity
-          onPress={() => { setVaultState(hasVaultPin ? "unlock" : "setup-enter"); setVaultData(null); clearPin(); }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          className="w-[38px] h-[38px] items-center justify-center"
-        >
-          <Ionicons name="lock-closed-outline" size={20} color="#a855f7" />
-        </TouchableOpacity>
+        <View className="flex-row gap-2">
+          {/* Change PIN */}
+          <TouchableOpacity
+            onPress={() => { clearPin(); setFirst(""); setVaultState("change-verify"); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            className="w-[38px] h-[38px] items-center justify-center"
+          >
+            <Ionicons name="key-outline" size={20} color="#6b7280" />
+          </TouchableOpacity>
+          {/* Re-lock */}
+          <TouchableOpacity
+            onPress={() => { setVaultState(hasVaultPin ? "unlock" : "setup-enter"); setVaultData(null); clearPin(); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            className="w-[38px] h-[38px] items-center justify-center"
+          >
+            <Ionicons name="lock-closed-outline" size={20} color="#a855f7" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -402,11 +585,10 @@ export default function VaultScreen() {
           <Ionicons name="lock-closed" size={16} color="#a855f7" style={{ marginTop: 1 }} />
           <Text className="flex-1 text-xs text-muted" style={{ lineHeight: 17 }}>
             Full numbers live only here. Tap the eye to reveal, tap a value to copy.
-            CVV is never stored.
+            CVV is never stored. Edit or delete items from here.
           </Text>
         </View>
 
-        {/* Show loading while vault data is being fetched from server */}
         {!vaultData && !isEmpty && (
           <View className="items-center py-4">
             <Text className="text-sm text-muted">Loading sensitive data…</Text>
@@ -428,7 +610,6 @@ export default function VaultScreen() {
           </View>
         ) : (
           <View className="gap-4">
-            {/* Accounts */}
             {accounts.length > 0 && (
               <Text className="text-xs font-bold text-secondary uppercase tracking-widest">
                 Bank Accounts
@@ -436,8 +617,9 @@ export default function VaultScreen() {
             )}
             {accounts.map((a) => {
               const va = vaultData?.accounts.find((v) => v.id === a.id);
+              const name = a.accountName?.trim() || a.nickname?.trim() || a.bank;
               return (
-                <SectionCard key={a.id} title={a.accountName?.trim() || a.nickname?.trim() || a.bank}>
+                <SectionCard key={a.id} title={name}>
                   <SecretRow
                     label="Account Number"
                     masked={maskAccountNumber({ ...a, accountNumber: va?.accountNumber ?? undefined }) || "—"}
@@ -451,11 +633,31 @@ export default function VaultScreen() {
                       {a.bank}{accountLast4(a) ? ` · •••• ${accountLast4(a)}` : ""}
                     </Text>
                   </View>
+                  {/* Edit / Delete */}
+                  <View className="flex-row gap-2 pt-3 mt-1 border-t border-white/[0.06]">
+                    <TouchableOpacity
+                      onPress={() => router.push(`/add-account?id=${a.id}`)}
+                      className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5 border border-white/[0.08]"
+                      style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons name="create-outline" size={15} color="#9ca3af" />
+                      <Text className="text-xs font-semibold text-secondary">Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => deleteAccount(a.id, name)}
+                      className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5 border border-accent-red/20"
+                      style={{ backgroundColor: "rgba(248,113,113,0.08)" }}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons name="trash-outline" size={15} color="#f87171" />
+                      <Text className="text-xs font-semibold text-accent-red">Delete</Text>
+                    </TouchableOpacity>
+                  </View>
                 </SectionCard>
               );
             })}
 
-            {/* Cards — only credit cards in vault (debit cards have no stored PAN secrets) */}
             {cards.filter((c) => c.type !== "debit").length > 0 && (
               <Text className="text-xs font-bold text-secondary uppercase tracking-widest mt-2">
                 Cards
@@ -464,8 +666,9 @@ export default function VaultScreen() {
             {cards.filter((c) => c.type !== "debit").map((c) => {
               const vc = vaultData?.cards.find((v) => v.id === c.id);
               const fullNumber = vc?.number ?? "";
+              const name = c.cardName || `${c.bank} Card`;
               return (
-                <SectionCard key={c.id} title={c.cardName || `${c.bank} Card`}>
+                <SectionCard key={c.id} title={name}>
                   <SecretRow
                     label="Card Number"
                     masked={maskCardNumber({ ...c, number: vc?.number ?? undefined })}
@@ -481,6 +684,27 @@ export default function VaultScreen() {
                     <Text className="text-sm text-muted">
                       {[c.network, c.bank].filter(Boolean).join(" · ") || "—"}
                     </Text>
+                  </View>
+                  {/* Edit / Delete */}
+                  <View className="flex-row gap-2 pt-3 mt-1 border-t border-white/[0.06]">
+                    <TouchableOpacity
+                      onPress={() => router.push(`/add-card?id=${c.id}`)}
+                      className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5 border border-white/[0.08]"
+                      style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons name="create-outline" size={15} color="#9ca3af" />
+                      <Text className="text-xs font-semibold text-secondary">Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => deleteCard(c.id, name)}
+                      className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl py-2.5 border border-accent-red/20"
+                      style={{ backgroundColor: "rgba(248,113,113,0.08)" }}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons name="trash-outline" size={15} color="#f87171" />
+                      <Text className="text-xs font-semibold text-accent-red">Delete</Text>
+                    </TouchableOpacity>
                   </View>
                 </SectionCard>
               );

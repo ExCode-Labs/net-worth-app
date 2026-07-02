@@ -22,7 +22,13 @@ export const usePrefsStore = create<PrefsStore>()(
   ),
 );
 
-/** Returns the masked string when amounts are hidden, else the value. */
-export function maskAmount(value: string, hidden: boolean): string {
-  return hidden ? "••••••" : value;
+/**
+ * Call once at the top of any screen that renders fmt()/fmtShort() output.
+ * Those read hideAmounts as a store snapshot (they're plain functions, not
+ * hooks), so a screen that never subscribes won't re-render — and stays
+ * stuck showing whatever masked/unmasked state was true at its last render
+ * — when the toggle is flipped from elsewhere (e.g. the home screen).
+ */
+export function useAmountVisibilitySync(): void {
+  usePrefsStore((s) => s.hideAmounts);
 }

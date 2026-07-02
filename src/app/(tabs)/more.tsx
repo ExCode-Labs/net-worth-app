@@ -9,6 +9,7 @@ import { useAccountStore, selectNetWorth, selectTotalAssets } from "@/store/acco
 import { useLiabilityStore, selectTotalLiabilities } from "@/store/liabilityStore";
 import { useCardStore, selectTotalUsage } from "@/store/cardStore";
 import { fmtShort } from "@/utils/formatters";
+import { useAmountVisibilitySync } from "@/store/prefsStore";
 import { Avatar } from "@/components/ui/Avatar";
 import { logout } from "@/services/auth";
 import { clearAllDataStores } from "@/services/sync";
@@ -32,7 +33,7 @@ const SECTIONS: {
   {
     title: "Insights",
     items: [
-      { icon: "bulb-outline",          label: "AI Insights",   sub: "Smart spending analysis",        accent: "#fbbf24" },
+      { icon: "bulb-outline",          label: "AI Insights",   sub: "Smart spending analysis",        accent: "#fbbf24", onPress: () => router.push("/ai-insights") },
       { icon: "bar-chart-outline",     label: "Analytics",     sub: "Charts & spending reports",      accent: "#3b82f6" },
       { icon: "flag-outline",          label: "Budget Goals",  sub: "Set & track monthly budgets",    accent: "#a855f7" },
     ],
@@ -51,6 +52,7 @@ const SECTIONS: {
 ];
 
 export default function ProfileScreen() {
+  useAmountVisibilitySync();
   const { signOut, isGuest }      = useAuthStore();
   const { guestName, phone, firstName: profileFirst, fullName, email, avatarUrl, reset: resetUser } = useUserStore();
   const accountStore   = useAccountStore();

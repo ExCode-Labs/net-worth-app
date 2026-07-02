@@ -13,7 +13,8 @@
  * actions calling backend.pushCreate/syncCreate/Update/Remove). This module only handles
  * the initial load + reconcile. No-ops cleanly when no backend is configured.
  */
-import { fetchBootstrap, syncCreate, isDirty, clearDirty, type Bootstrap } from "@/services/backend";
+import { fetchBootstrap, syncBulk, isDirty, clearDirty, type Bootstrap } from "@/services/backend";
+import type { Resource } from "@/services/backend";
 import { apiEnabled } from "@/services/api";
 import { useAccountStore } from "@/store/accountStore";
 import { useCardStore } from "@/store/cardStore";
@@ -21,6 +22,7 @@ import { useLiabilityStore } from "@/store/liabilityStore";
 import { useTransactionStore } from "@/store/transactionStore";
 import { useUserStore } from "@/store/userStore";
 import { useAuthStore } from "@/store/authStore";
+import { resetShareCache } from "@/services/sharing";
 
 function localIsEmpty(): boolean {
   return (
@@ -43,13 +45,16 @@ function hydrateProfile(b: Bootstrap) {
   if (b.me.guestName) useUserStore.setState({ guestName: b.me.guestName });
   if (b.me.phone) useUserStore.setState({ phone: b.me.phone });
   useUserStore.getState().setProfile({
-    firstName:   b.me.firstName,
-    lastName:    b.me.lastName,
-    fullName:    b.me.fullName,
-    email:       b.me.email,
-    avatarUrl:   b.me.avatarUrl,
-    hasVaultPin: b.me.hasVaultPin ?? false,
+    firstName:        b.me.firstName,
+    lastName:         b.me.lastName,
+    fullName:         b.me.fullName,
+    email:            b.me.email,
+    avatarUrl:        b.me.avatarUrl,
+    hasVaultPin:      b.me.hasVaultPin ?? false,
+    hasPassword:      b.me.hasPassword ?? false,
+    twoFactorEnabled: b.me.twoFactorEnabled ?? false,
   });
+  useUserStore.setState({ userId: b.me.id });
 }
 
 function hydrateFromBootstrap(b: Bootstrap) {
@@ -69,17 +74,20 @@ function hydrateFromBootstrap(b: Bootstrap) {
  * optimistic push was dropped (offline, slow start, etc.).
  */
 export function pushAllLocal() {
-  reconcilePush();
+  void reconcilePush();
 }
 
-/** Re-push every local entity (idempotent) so the server matches the device. */
-function reconcilePush() {
+/** Re-push every local entity (idempotent) so the server matches the device. One bulk call. */
+async function reconcilePush() {
   const a = useAccountStore.getState();
-  a.accounts.forEach((x) => syncCreate("accounts", x));
-  a.assets.forEach((x) => syncCreate("assets", x));
-  useCardStore.getState().cards.forEach((x) => syncCreate("cards", x));
-  useLiabilityStore.getState().liabilities.forEach((x) => syncCreate("liabilities", x));
-  useTransactionStore.getState().transactions.forEach((x) => syncCreate("transactions", x));
+  const entities: Array<{ resource: Resource; id: string; data: object }> = [
+    ...a.accounts.map((x) => ({ resource: "accounts" as Resource, id: x.id, data: x })),
+    ...a.assets.map((x) => ({ resource: "assets" as Resource, id: x.id, data: x })),
+    ...useCardStore.getState().cards.map((x) => ({ resource: "cards" as Resource, id: x.id, data: x })),
+    ...useLiabilityStore.getState().liabilities.map((x) => ({ resource: "liabilities" as Resource, id: x.id, data: x })),
+    ...useTransactionStore.getState().transactions.map((x) => ({ resource: "transactions" as Resource, id: x.id, data: x })),
+  ];
+  await syncBulk(entities);
   clearDirty();
 }
 
@@ -104,19 +112,34 @@ export async function startSync(): Promise<void> {
   try {
     const b = await withTimeout(fetchBootstrap(), 8000);
     if (b) {
+      // If the stored userId doesn't match the signed-in account, wipe stale local
+      // data so it can't cross-contaminate the new account (handles kill-during-logout).
+      const storedUserId = useUserStore.getState().userId;
+      if (storedUserId && storedUserId !== b.me.id) {
+        clearAllDataStores();
+      }
+
       hydrateProfile(b); // always — independent of local financial data
-      if (localIsEmpty()) {
+
+      const serverHasData =
+        b.accounts.length > 0 || b.cards.length > 0 ||
+        b.transactions.length > 0 || b.assets.length > 0 || b.liabilities.length > 0;
+
+      if (serverHasData) {
+        // Server is authoritative when it has data — always adopt it.
         hydrateFromBootstrap(b);
         await useAuthStore.getState().applyServerOnboarded(b.me.onboarded);
-      } else {
-        reconcilePush();
-        // Returning user with local data: honour server onboarding if it's set.
+      } else if (!localIsEmpty()) {
+        // Fresh server + local data → offline-first onboarding: push local up.
+        await reconcilePush();
         if (b.me.onboarded) await useAuthStore.getState().applyServerOnboarded(true);
+      } else {
+        await useAuthStore.getState().applyServerOnboarded(b.me.onboarded);
       }
     }
   } catch {
     // Offline / server down — keep local state, just unblock routing.
-    if (isDirty()) reconcilePush();
+    if (isDirty()) void reconcilePush();
   } finally {
     useAuthStore.setState({ isBootstrapped: true });
   }
@@ -137,6 +160,7 @@ export function clearAllDataStores(): void {
   useLiabilityStore.getState().reset();
   useTransactionStore.getState().reset();
   useUserStore.getState().reset();
+  resetShareCache();
 }
 
 /** Manual reconcile (e.g. pull-to-refresh / returning to foreground). */
@@ -146,8 +170,11 @@ export async function resync(): Promise<void> {
     const b = await fetchBootstrap();
     if (b) {
       hydrateProfile(b);
-      if (localIsEmpty()) hydrateFromBootstrap(b);
-      else reconcilePush();
+      const serverHasData =
+        b.accounts.length > 0 || b.cards.length > 0 ||
+        b.transactions.length > 0 || b.assets.length > 0 || b.liabilities.length > 0;
+      if (serverHasData) hydrateFromBootstrap(b);
+      else if (!localIsEmpty()) void reconcilePush();
     }
   } catch {
     /* ignore */

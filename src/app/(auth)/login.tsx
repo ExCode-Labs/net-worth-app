@@ -139,11 +139,15 @@ export default function LoginScreen() {
     setLoading("email");
     Keyboard.dismiss();
     try {
-      await emailLogin(email, siPassword);
-      setPendingEmail(email);
-      setOtp("");
-      setStage("otp");
-      toast.success("Code sent — check your email.");
+      const result = await emailLogin(email, siPassword);
+      if ("twoFactor" in result) {
+        setPendingEmail(email);
+        setOtp("");
+        setStage("otp");
+        toast.success("Code sent — check your email.");
+      } else {
+        await finishLogin(result);
+      }
     } catch (e) {
       toast.error(apiError(e));
     } finally {

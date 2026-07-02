@@ -9,20 +9,23 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useAccountStore } from "@/store/accountStore";
 import { usePrefsStore } from "@/store/prefsStore";
+import { useCurrencyStore } from "@/store/currencyStore";
+import { CURRENCIES } from "@/constants/currencies";
 
-const CURRENCIES: { code: string; label: string; symbol: string }[] = [
-  { code: "INR", label: "Indian Rupee",   symbol: "₹" },
-  { code: "USD", label: "US Dollar",      symbol: "$" },
-  { code: "EUR", label: "Euro",           symbol: "€" },
-  { code: "GBP", label: "British Pound",  symbol: "£" },
-  { code: "AED", label: "UAE Dirham",     symbol: "د.إ" },
-  { code: "SGD", label: "Singapore Dollar", symbol: "S$" },
-];
+/** "Updated just now" / "Updated 12m ago" / "Updated 3h ago". */
+function rateAge(updatedAt: number | null): string {
+  if (!updatedAt) return "Rates not loaded yet";
+  const mins = Math.floor((Date.now() - updatedAt) / 60_000);
+  if (mins < 1) return "Rates updated just now";
+  if (mins < 60) return `Rates updated ${mins}m ago`;
+  return `Rates updated ${Math.floor(mins / 60)}h ago`;
+}
 
 export default function PreferencesScreen() {
   const currency    = useAccountStore((s) => s.currency);
   const setCurrency = useAccountStore((s) => s.setCurrency);
   const { hideAmounts, setHideAmounts } = usePrefsStore();
+  const ratesUpdatedAt = useCurrencyStore((s) => s.updatedAt);
 
   return (
     <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-cosmic-darker">
@@ -67,7 +70,7 @@ export default function PreferencesScreen() {
                     </View>
                     <View className="flex-1">
                       <Text className="text-base font-semibold text-white">{c.code}</Text>
-                      <Text className="text-xs text-dim">{c.label}</Text>
+                      <Text className="text-xs text-dim">{c.name}</Text>
                     </View>
                     {active && <Ionicons name="checkmark-circle" size={20} color="#a855f7" />}
                   </TouchableOpacity>
@@ -75,7 +78,7 @@ export default function PreferencesScreen() {
               })}
             </View>
             <Text className="text-[11px] text-dim mt-2">
-              Amounts currently display in ₹. Full multi-currency formatting is coming.
+              Amounts convert at the live INR exchange rate. {rateAge(ratesUpdatedAt)}.
             </Text>
           </View>
 
