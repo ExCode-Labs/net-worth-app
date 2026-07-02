@@ -163,21 +163,28 @@ export default function AddScreen() {
                     <TouchableOpacity
                       key={c.name}
                       onPress={() => setCategory(c.name)}
-                      className={`w-[22%] rounded-[13px] border items-center justify-center gap-[5px] ${
+                      className={`w-[22%] rounded-[13px] border items-center ${
                         active
                           ? "bg-accent-purple/[0.15] border-accent-purple"
                           : "bg-white/[0.05] border-white/[0.08]"
                       }`}
-                      style={{ aspectRatio: 0.9 }}
+                      style={{ aspectRatio: 0.9, paddingVertical: 8, paddingHorizontal: 3 }}
                       activeOpacity={0.75}
                     >
-                      <Ionicons name={c.icon} size={22} color={active ? amtColor : "#6b7280"} />
-                      <Text
-                        className="text-[8px] text-center font-semibold"
-                        style={{ color: active ? amtColor : "#6b7280" }}
-                      >
-                        {c.name}
-                      </Text>
+                      {/* Icon fills the flexible top zone so it's centred the same
+                          in every tile regardless of how many lines the label wraps to. */}
+                      <View className="flex-1 items-center justify-center">
+                        <Ionicons name={c.icon} size={22} color={active ? amtColor : "#6b7280"} />
+                      </View>
+                      <View className="items-center justify-center" style={{ height: 20 }}>
+                        <Text
+                          numberOfLines={2}
+                          className="text-[8px] text-center font-semibold"
+                          style={{ color: active ? amtColor : "#6b7280", lineHeight: 10 }}
+                        >
+                          {c.name}
+                        </Text>
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
