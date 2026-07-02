@@ -120,7 +120,7 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="analytics"
+        name="cards"
         options={{
           title: "Cards",
           tabBarIcon: ({ focused }) => (

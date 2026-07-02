@@ -25,7 +25,7 @@ const SECTIONS: {
     title: "Finance",
     items: [
       { icon: "wallet-outline",        label: "Accounts",     sub: "Manage bank & wallet accounts",  accent: "#3b82f6", onPress: () => router.push("/accounts") },
-      { icon: "card-outline",          label: "Cards",        sub: "Credit & debit cards",            accent: "#a855f7", onPress: () => router.push("/analytics") },
+      { icon: "card-outline",          label: "Cards",        sub: "Credit & debit cards",            accent: "#a855f7", onPress: () => router.push("/cards") },
       { icon: "trending-up-outline",   label: "Assets",       sub: "Investments, property & gold",   accent: "#4ade80", onPress: () => router.push("/assets") },
       { icon: "trending-down-outline", label: "Liabilities",  sub: "Loans, EMIs & dues",             accent: "#f87171", onPress: () => router.push("/liabilities") },
     ],
@@ -34,7 +34,7 @@ const SECTIONS: {
     title: "Insights",
     items: [
       { icon: "bulb-outline",          label: "AI Insights",   sub: "Smart spending analysis",        accent: "#fbbf24", onPress: () => router.push("/ai-insights") },
-      { icon: "bar-chart-outline",     label: "Analytics",     sub: "Charts & spending reports",      accent: "#3b82f6", onPress: () => router.push("/spending") },
+      { icon: "bar-chart-outline",     label: "Analytics",     sub: "Charts & spending reports",      accent: "#3b82f6", onPress: () => router.push("/analytics") },
       { icon: "flag-outline",          label: "Budget Goals",  sub: "Set & track monthly budgets",    accent: "#a855f7" },
     ],
   },

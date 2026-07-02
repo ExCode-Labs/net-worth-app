@@ -174,7 +174,7 @@ function RouteGate() {
       <Stack.Screen name="preferences" />
       <Stack.Screen name="ai-insights" />
       <Stack.Screen name="badge" />
-      <Stack.Screen name="spending" />
+      <Stack.Screen name="analytics" />
       <Stack.Screen name="security" />
       <Stack.Screen name="edit-profile" />
       <Stack.Screen name="sessions" />

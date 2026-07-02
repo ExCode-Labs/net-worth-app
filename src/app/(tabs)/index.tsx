@@ -245,7 +245,7 @@ export default function HomeScreen() {
 
             <View className="flex-row justify-between">
               <QuickAction icon="wallet-outline"        label="Accounts"    bg="rgba(59,130,246,0.25)" onPress={() => router.push("/accounts")} />
-              <QuickAction icon="card-outline"          label="Cards"       bg="rgba(168,85,247,0.25)" onPress={() => router.push("/analytics")} />
+              <QuickAction icon="card-outline"          label="Cards"       bg="rgba(168,85,247,0.25)" onPress={() => router.push("/cards")} />
               <QuickAction icon="trending-up-outline"   label="Assets"      bg="rgba(74,222,128,0.2)" onPress={() => router.push("/assets")} />
               <QuickAction icon="trending-down-outline" label="Liabilities" bg="rgba(248,113,113,0.2)" onPress={() => router.push("/liabilities")} />
             </View>
@@ -259,7 +259,7 @@ export default function HomeScreen() {
             style={{ backgroundColor: "rgba(255,255,255,0.05)" }}
           >
             <TouchableOpacity
-              onPress={() => router.push("/spending")}
+              onPress={() => router.push("/analytics")}
               activeOpacity={0.7}
               className="flex-row justify-between items-center mb-[14px]"
             >
