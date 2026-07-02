@@ -50,6 +50,12 @@ interface TransactionStore {
  * handled by bankIngest directly — don't set accountId on them.
  */
 function applyTxBalance(tx: Omit<Transaction, "id"> & { id?: string }, sign: 1 | -1) {
+  // Only manual txns drive balances here. Notification/card txns are applied
+  // out-of-band by bankIngest (to the bank's authoritative balance) and carry no
+  // accountId — without this guard, opening one in the edit screen (which invents
+  // an accountId from the label) would subtract the amount on save even if nothing
+  // changed, because the reverse pass finds no old accountId to cancel it. (#15)
+  if (tx.source !== "manual") return;
   if (!tx.accountId && !tx.toAccountId) return;
   const { accounts, updateAccount } = useAccountStore.getState();
 

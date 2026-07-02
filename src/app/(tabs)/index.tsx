@@ -10,7 +10,7 @@ import { useTransactionStore } from "@/store/transactionStore";
 import { useCardStore, selectTotalLimit, selectTotalUsage } from "@/store/cardStore";
 import { useLiabilityStore, selectTotalLiabilities } from "@/store/liabilityStore";
 import { usePrefsStore } from "@/store/prefsStore";
-import { fmt, fmtShort, getGreeting } from "@/utils/formatters";
+import { fmt, fmtSigned, fmtShort, getGreeting } from "@/utils/formatters";
 import AiInsightsCard from "@/components/home/AiInsightsCard";
 import type { Transaction } from "@/store/transactionStore";
 
@@ -163,12 +163,20 @@ export default function HomeScreen() {
             <View style={{ position: "absolute", top: -30, right: -20, width: 140, height: 140, borderRadius: 70, backgroundColor: "rgba(168,85,247,0.12)" }} pointerEvents="none" />
             <View className="flex-row justify-between items-center mb-3">
               <Text className="text-base text-secondary font-semibold tracking-wide">Total Net Worth</Text>
-              <Ionicons name="close-outline" size={20} color="#6b7280" />
+              <TouchableOpacity
+                onPress={() => router.push("/badge")}
+                hitSlop={8}
+                className="flex-row items-center gap-1 rounded-full border border-accent-purple/30 px-2.5 py-1"
+                style={{ backgroundColor: "rgba(168,85,247,0.14)" }}
+              >
+                <Ionicons name="ribbon-outline" size={13} color="#a855f7" />
+                <Text className="text-[11px] font-bold text-accent-purple">Badge</Text>
+              </TouchableOpacity>
             </View>
             <View className="flex-row justify-between items-end">
               <View className="flex-1">
                 <Text style={{ fontSize: 30, fontWeight: "800", color: "#fff", marginBottom: 8 }}>
-                  {fmt(netWorth)}
+                  {fmtSigned(netWorth)}
                 </Text>
                 {hasRealData ? (
                   <View className="flex-row items-center gap-1">
@@ -206,7 +214,7 @@ export default function HomeScreen() {
                 style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
               >
                 <Text className="text-xs text-muted mb-1.5">Total Balance</Text>
-                <Text className="text-xl font-bold text-white">{fmt(totalBalance)}</Text>
+                <Text className="text-xl font-bold text-white">{fmtSigned(totalBalance)}</Text>
               </View>
               <View
                 className="flex-1 rounded-[12px] p-[14px] border border-white/[0.08]"
@@ -282,22 +290,33 @@ export default function HomeScreen() {
               <Text className="text-xs text-dim mb-4">No expenses recorded yet</Text>
             )}
 
-            <View className="flex-row items-end gap-2" style={{ height: 80 }}>
+            <View className="flex-row items-end gap-2" style={{ height: 108 }}>
               {expense.months.map((b, i) => {
                 const last = i === expense.months.length - 1;
-                const pct  = b.total / expense.max;
+                const pct  = expense.max > 0 ? b.total / expense.max : 0;
                 return (
                   <View key={b.key} className="flex-1 items-center gap-1.5">
+                    {/* Selective direct label — only the current month, never every bar */}
+                    <Text
+                      className="text-[9px] font-bold"
+                      style={{ color: "#a855f7", opacity: last && b.total > 0 ? 1 : 0 }}
+                      numberOfLines={1}
+                    >
+                      {fmtShort(b.total)}
+                    </Text>
+                    {/* Track + fill: magnitude is the height; the bar is one hue,
+                        with the current month solid to mark "now" (not magnitude). */}
                     <View
-                      className="w-full rounded-[6px] justify-end overflow-hidden"
-                      style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.06)" }}
+                      className="w-full justify-end overflow-hidden rounded-t-[6px]"
+                      style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.05)" }}
                     >
                       <View
                         style={{
                           width: "100%",
-                          height: `${pct * 100}%`,
-                          borderRadius: 6,
-                          backgroundColor: last ? "#a855f7" : "rgba(168,85,247,0.3)",
+                          height: `${Math.max(pct * 100, b.total > 0 ? 4 : 0)}%`,
+                          borderTopLeftRadius: 6,
+                          borderTopRightRadius: 6,
+                          backgroundColor: last ? "#a855f7" : "rgba(168,85,247,0.28)",
                         }}
                       />
                     </View>

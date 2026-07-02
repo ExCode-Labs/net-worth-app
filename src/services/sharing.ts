@@ -155,6 +155,10 @@ export function upsertShare(recipientId: string, categories: string[], items?: S
 export function revokeShare(recipientId: string) {
   return apiDelete<unknown>(`/share/out/${recipientId}`);
 }
+/** Opt out of an owner sharing their data with me (#20). */
+export function optOutIncoming(ownerId: string) {
+  return apiDelete<unknown>(`/share/in/${ownerId}`);
+}
 
 export interface SharedData {
   owner: { id: string; name: string; avatarUrl: string | null } | null;

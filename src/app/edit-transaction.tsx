@@ -19,7 +19,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Button } from "@/components/ui/Button";
 import { useTransactionStore } from "@/store/transactionStore";
-import { learnCategory } from "@/store/categoryStore";
+import { learnCategory, categoryKey } from "@/store/categoryStore";
 import { useAccountStore, accountLabel } from "@/store/accountStore";
 import { Chip } from "@/components/ui/Chip";
 import { TX_TYPES, TX_TYPE_COLORS, CATEGORIES, type TxType } from "@/constants/categories";
@@ -78,11 +78,31 @@ export default function EditTransactionScreen() {
       date:      date.toISOString(),
       note:      note.trim(),
     });
-    // Learn this merchant→category and retag matching transactions.
-    learnCategory(merchantName, category);
-    toast.success("Transaction updated.");
     setSaving(false);
-    router.back();
+
+    const finish = () => { toast.success("Transaction updated."); router.back(); };
+
+    // If the category changed and other transactions share this merchant, ask
+    // whether to retag just this one or all of them — instead of silently
+    // propagating to every match. (#21)
+    const key = categoryKey(merchantName);
+    const matches = useTransactionStore.getState().transactions
+      .filter((t) => t.id !== tx.id && categoryKey(t.merchant) === key).length;
+
+    if (category !== tx.category && matches > 0 && key !== "unknown") {
+      confirm({
+        title: "Apply to matching transactions?",
+        message: `${matches} other transaction${matches > 1 ? "s" : ""} from "${merchantName}" ${matches > 1 ? "share" : "shares"} this merchant. Recategorise ${matches > 1 ? "them" : "it"} to "${category}" too, or just this one?`,
+        confirmText: "All matching",
+        cancelText: "Just this one",
+        onConfirm: () => { learnCategory(merchantName, category); finish(); },
+        onCancel: finish, // this txn only — don't learn a rule or retag siblings
+      });
+    } else {
+      // No siblings to affect: safe to learn the rule for future txns.
+      learnCategory(merchantName, category);
+      finish();
+    }
   };
 
   const handleDelete = () => {
@@ -99,7 +119,7 @@ export default function EditTransactionScreen() {
     <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-cosmic-darker">
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior="padding"
         keyboardVerticalOffset={0}
       >
         {/* Header */}

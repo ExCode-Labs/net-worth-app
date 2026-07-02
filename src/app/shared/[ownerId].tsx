@@ -13,9 +13,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { fetchSharedData, type SharedData } from "@/services/sharing";
-import { fmt } from "@/utils/formatters";
+import { fetchSharedData, optOutIncoming, resetShareCache, type SharedData } from "@/services/sharing";
+import { fmt, fmtSigned } from "@/utils/formatters";
 import { useAmountVisibilitySync } from "@/store/prefsStore";
+import { confirm } from "@/store/confirmStore";
+import { toast } from "@/store/toastStore";
+import { apiError } from "@/utils/apiError";
 
 export default function SharedDataScreen() {
   useAmountVisibilitySync();
@@ -44,6 +47,27 @@ export default function SharedDataScreen() {
 
   const name = data?.owner?.name ?? "Shared";
 
+  const handleOptOut = () => {
+    if (!ownerId) return;
+    confirm({
+      title: `Opt out of ${name}?`,
+      message: `You'll stop seeing ${name}'s shared data and they'll no longer appear in your sharing list. They can share with you again later.`,
+      confirmText: "Opt out",
+      cancelText: "Cancel",
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await optOutIncoming(ownerId);
+          resetShareCache(); // force the sharing list to refetch without this owner
+          toast.success(`Opted out of ${name}.`);
+          router.back();
+        } catch (e) {
+          toast.error(apiError(e, "Couldn't opt out."));
+        }
+      },
+    });
+  };
+
   return (
     <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-cosmic-darker">
       <View className="flex-row items-center px-xl pt-3 pb-[14px] gap-3">
@@ -55,9 +79,19 @@ export default function SharedDataScreen() {
         >
           <Ionicons name="chevron-back" size={22} color="#9ca3af" />
         </TouchableOpacity>
-        <Text className="text-lg font-bold text-white" numberOfLines={1}>
+        <Text className="flex-1 text-lg font-bold text-white" numberOfLines={1}>
           {name}
         </Text>
+        {data && (
+          <TouchableOpacity
+            onPress={handleOptOut}
+            className="w-[38px] h-[38px] rounded-[11px] border border-accent-red/35 items-center justify-center"
+            style={{ backgroundColor: "rgba(248,113,113,0.12)" }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="eye-off-outline" size={18} color="#f87171" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {loading ? (
@@ -82,7 +116,7 @@ export default function SharedDataScreen() {
                 <Text
                   style={{ fontSize: 26, fontWeight: "800", color: "#fff" }}
                 >
-                  {fmt(data.balance.total)}
+                  {fmtSigned(data.balance.total)}
                 </Text>
                 <Text className="text-xs text-muted mt-1">
                   {data.balance.accounts} account

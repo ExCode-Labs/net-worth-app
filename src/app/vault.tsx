@@ -36,6 +36,7 @@ import {
 } from "@/services/vaultPin";
 import { fetchVaultData, type VaultData } from "@/services/backend";
 import { apiError } from "@/utils/apiError";
+import { usePreventScreenCapture } from "expo-screen-capture";
 import PinPad from "@/components/security/PinPad";
 
 const PIN_LEN = 6;
@@ -103,6 +104,10 @@ type VaultState =
   | "open";
 
 export default function VaultScreen() {
+  // Block screenshots / recording / screen-share for the whole vault — the
+  // unlocked view exposes full card & account numbers. (#18)
+  usePreventScreenCapture("vault");
+
   const accounts       = useAccountStore((s) => s.accounts);
   const removeAccount  = useAccountStore((s) => s.removeAccount);
   const cards          = useCardStore((s) => s.cards);

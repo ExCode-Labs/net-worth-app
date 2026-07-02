@@ -151,11 +151,14 @@ const MONTHS: Record<string, number> = {
   jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
 };
 
-/** Build an ISO date (UTC, so the calendar date is tz-stable) from parts. */
+/** Build an ISO date from parts. A bank message states its date/time in the
+ *  user's LOCAL zone, so construct with the local Date ctor (not Date.UTC) —
+ *  toISOString then yields the correct instant and the UI, which renders with
+ *  local toLocaleTimeString, shows the time the message actually stated. (#1) */
 function isoOf(y: number, mo: number, d: number, hh = 0, mm = 0, ss = 0): string | null {
   if (!mo || isNaN(y) || isNaN(d)) return null;
   if (y < 100) y += 2000;
-  const dt = new Date(Date.UTC(y, mo - 1, d, hh, mm, ss));
+  const dt = new Date(y, mo - 1, d, hh, mm, ss);
   return isNaN(dt.getTime()) ? null : dt.toISOString();
 }
 

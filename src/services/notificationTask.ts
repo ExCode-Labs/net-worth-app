@@ -15,6 +15,7 @@ import {
   notificationListenerAvailable,
 } from "./notificationListener";
 import { ingestMessage } from "./bankIngest";
+import { isDuplicateNotification } from "./notifDedup";
 
 if (notificationListenerAvailable) {
   AppRegistry.registerHeadlessTask(
@@ -22,6 +23,9 @@ if (notificationListenerAvailable) {
     () => async (payload: unknown) => {
       const n = normalizeNativePayload(payload);
       if (!n) return;
+      // Android re-delivers the same notification on every update — skip repeats
+      // so a txn isn't captured (and its balance applied) twice. (#3)
+      if (await isDuplicateNotification(n.app, n.text, n.time)) return;
       // Body is parsed; the title (SMS sender, e.g. "VM-HDFCBK") identifies the bank.
       ingestMessage(n.text, n.time, n.title);
     },

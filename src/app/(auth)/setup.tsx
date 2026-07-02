@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   KeyboardAvoidingView,
-  Platform,
   TouchableOpacity,
   LayoutChangeEvent,
 } from "react-native";
@@ -335,7 +334,7 @@ export default function SetupScreen() {
         // Android already resizes the window for the keyboard (Expo
         // softwareKeyboardLayoutMode: "resize"); using "height" on top of that
         // double-adjusts and leaves residual space after an open/close cycle.
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior="padding"
         keyboardVerticalOffset={0}
       >
         {/* ── Header ──────────────────────────────────────────── */}
