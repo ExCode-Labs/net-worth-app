@@ -36,7 +36,7 @@ import {
 } from "@/services/vaultPin";
 import { fetchVaultData, type VaultData } from "@/services/backend";
 import { apiError } from "@/utils/apiError";
-import { usePreventScreenCapture } from "expo-screen-capture";
+import { usePreventScreenCapture } from "@/utils/screenCapture";
 import PinPad from "@/components/security/PinPad";
 
 const PIN_LEN = 6;

@@ -6,11 +6,8 @@
 import React, { useEffect } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
-import { usePreventScreenCapture } from "expo-screen-capture";
-
-/** Light tactile tap on each key; never let a haptics failure break input. */
-const tap = () => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); };
+import { hapticTap } from "@/utils/haptics";
+import { usePreventScreenCapture } from "@/utils/screenCapture";
 
 interface Props {
   value: string;
@@ -44,10 +41,10 @@ export default function PinPad({
 
   const press = (d: string) => {
     if (value.length >= length) return;
-    tap();
+    hapticTap();
     onChange(value + d);
   };
-  const backspace = () => { tap(); onChange(value.slice(0, -1)); };
+  const backspace = () => { hapticTap(); onChange(value.slice(0, -1)); };
 
   const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
