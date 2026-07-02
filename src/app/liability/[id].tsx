@@ -16,9 +16,11 @@ import { SettleSheet, accountRefLabel, txnRefLabel } from "@/components/ui/Ledge
 import { fmt } from "@/utils/formatters";
 import { toast } from "@/store/toastStore";
 import { confirm } from "@/store/confirmStore";
+import { useAmountVisibilitySync } from "@/store/prefsStore";
 import { LIABILITY_TYPES } from "../liabilities";
 
 export default function LiabilityDetailScreen() {
+  useAmountVisibilitySync();
   const { id }          = useLocalSearchParams<{ id: string }>();
   const liability       = useLiabilityStore((s) => s.liabilities.find((l) => l.id === id));
   const accounts        = useAccountStore((s) => s.accounts);

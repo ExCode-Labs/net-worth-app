@@ -7,6 +7,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { pushCreate, syncCreate, pushUpdate, pushRemove, updateMe } from "@/services/backend";
 import { useBankStore } from "@/store/bankStore";
+import { useCurrencyStore } from "@/store/currencyStore";
 
 export interface Account {
   id: string;
@@ -16,9 +17,9 @@ export interface Account {
   nickname: string;         // e.g. "HDFC - 1234"
   balance: number;
   accountName?: string;     // optional holder/label, e.g. "Salary Account"
-  accountNumber?: string;   // full account number (vault) — masked outside vault page
-  ifsc?: string;            // optional IFSC code
-  branch?: string;          // optional branch name
+  accountNumber?: string;   // last 4 digits in bootstrap; full number only from GET /vault
+  ifsc?: string;            // vault-only
+  branch?: string;          // vault-only
 }
 
 /**
@@ -110,6 +111,8 @@ export const useAccountStore = create<AccountStore>()(
       setCurrency: (currency) => {
         set({ currency });
         void updateMe({ currency });
+        // Force a fresh rate at the moment of switching, per "current time" conversion.
+        void useCurrencyStore.getState().fetchRates(true);
       },
 
       addAccount: async (a) => {

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,9 +9,9 @@ import { useAccountStore, selectNetWorth, selectTotalBalance } from "@/store/acc
 import { useTransactionStore } from "@/store/transactionStore";
 import { useCardStore, selectTotalLimit, selectTotalUsage } from "@/store/cardStore";
 import { useLiabilityStore, selectTotalLiabilities } from "@/store/liabilityStore";
-import { usePrefsStore, maskAmount } from "@/store/prefsStore";
-import { toast } from "@/store/toastStore";
+import { usePrefsStore } from "@/store/prefsStore";
 import { fmt, fmtShort, getGreeting } from "@/utils/formatters";
+import AiInsightsCard from "@/components/home/AiInsightsCard";
 import type { Transaction } from "@/store/transactionStore";
 
 // ── Real monthly-expense series (last 6 calendar months) ──────────────────────
@@ -59,7 +59,7 @@ function QuickAction({ icon, label, bg, onPress }: { icon: IoniconName; label: s
 
 // ── Transaction row ───────────────────────────────────────────────────────────
 type TxRowItem = { id: string; icon: IoniconName; name: string; cat: string; amount: number; when: string };
-function TxRow({ item }: { item: TxRowItem }) {
+const TxRow = React.memo(function TxRow({ item }: { item: TxRowItem }) {
   const pos = item.amount > 0;
   return (
     <TouchableOpacity
@@ -86,7 +86,7 @@ function TxRow({ item }: { item: TxRowItem }) {
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
@@ -97,6 +97,7 @@ export default function HomeScreen() {
   const cardStore     = useCardStore();
   const liabilityStore = useLiabilityStore();
   const hideAmounts   = usePrefsStore((s) => s.hideAmounts);
+  const setHideAmounts = usePrefsStore((s) => s.setHideAmounts);
 
   const displayName = firstName ?? guestName ?? (isGuest ? "Guest" : "there");
 
@@ -117,11 +118,11 @@ export default function HomeScreen() {
   const hasCards    = cardStore.cards.length > 0;
   const creditPct   = creditLimit > 0 ? Math.round((creditUsed / creditLimit) * 100) : 0;
 
-  // Monthly expense series from real transactions
-  const expense = buildMonthlyExpense(transactions);
-
-  // Recent confirmed transactions (last 4)
-  const recentTx = transactions.filter((t) => t.status === "confirmed").slice(0, 4);
+  const expense = useMemo(() => buildMonthlyExpense(transactions), [transactions]);
+  const recentTx = useMemo(
+    () => transactions.filter((t) => t.status === "confirmed").slice(0, 4),
+    [transactions],
+  );
 
   return (
     <SafeAreaView edges={["top"]} className="flex-1 bg-cosmic-darker">
@@ -134,11 +135,21 @@ export default function HomeScreen() {
             <Text className="text-[22px] font-bold text-white">Hello, {displayName} 👋</Text>
           </View>
           <TouchableOpacity
-            onPress={() => toast.info("Notifications coming soon")}
-            className="w-[42px] h-[42px] rounded-[21px] border border-white/[0.08] items-center justify-center"
-            style={{ backgroundColor: "rgba(255,255,255,0.05)" }}
+            onPress={() => setHideAmounts(!hideAmounts)}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: hideAmounts }}
+            accessibilityLabel={hideAmounts ? "Show amounts" : "Hide amounts"}
+            className="w-[42px] h-[42px] rounded-[21px] border items-center justify-center"
+            style={{
+              backgroundColor: hideAmounts ? "rgba(168,85,247,0.15)" : "rgba(255,255,255,0.05)",
+              borderColor: hideAmounts ? "rgba(168,85,247,0.5)" : "rgba(255,255,255,0.08)",
+            }}
           >
-            <Ionicons name="notifications-outline" size={22} color="#9ca3af" />
+            <Ionicons
+              name={hideAmounts ? "lock-closed" : "lock-open-outline"}
+              size={20}
+              color={hideAmounts ? "#a855f7" : "#9ca3af"}
+            />
           </TouchableOpacity>
         </View>
 
@@ -157,7 +168,7 @@ export default function HomeScreen() {
             <View className="flex-row justify-between items-end">
               <View className="flex-1">
                 <Text style={{ fontSize: 30, fontWeight: "800", color: "#fff", marginBottom: 8 }}>
-                  {maskAmount(fmt(netWorth), hideAmounts)}
+                  {fmt(netWorth)}
                 </Text>
                 {hasRealData ? (
                   <View className="flex-row items-center gap-1">
@@ -195,7 +206,7 @@ export default function HomeScreen() {
                 style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
               >
                 <Text className="text-xs text-muted mb-1.5">Total Balance</Text>
-                <Text className="text-xl font-bold text-white">{maskAmount(fmt(totalBalance), hideAmounts)}</Text>
+                <Text className="text-xl font-bold text-white">{fmt(totalBalance)}</Text>
               </View>
               <View
                 className="flex-1 rounded-[12px] p-[14px] border border-white/[0.08]"
@@ -229,6 +240,8 @@ export default function HomeScreen() {
             </View>
           </View>
 
+          <AiInsightsCard />
+
           {/* Monthly Expense */}
           <View
             className="rounded-[18px] border border-white/[0.08] p-[18px]"
@@ -256,7 +269,7 @@ export default function HomeScreen() {
               )}
             </View>
             <Text style={{ fontSize: 28, fontWeight: "800", color: "#fff", marginBottom: 4 }}>
-              {maskAmount(fmt(expense.thisMonth), hideAmounts)}
+              {fmt(expense.thisMonth)}
             </Text>
             {expense.changePct !== null ? (
               <Text

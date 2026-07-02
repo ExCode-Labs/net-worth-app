@@ -15,8 +15,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { fetchSharedData, type SharedData } from "@/services/sharing";
 import { fmt } from "@/utils/formatters";
+import { useAmountVisibilitySync } from "@/store/prefsStore";
 
 export default function SharedDataScreen() {
+  useAmountVisibilitySync();
   const { ownerId } = useLocalSearchParams<{ ownerId: string }>();
   const [data, setData] = useState<SharedData | null>(null);
   const [loading, setLoad] = useState(true);
@@ -86,6 +88,13 @@ export default function SharedDataScreen() {
                   {data.balance.accounts} account
                   {data.balance.accounts !== 1 ? "s" : ""}
                 </Text>
+                {data.balance.items.length > 0 && (
+                  <View className="mt-2 gap-1.5">
+                    {data.balance.items.map((a, i) => (
+                      <Row key={i} left={a.name} sub={a.bank} right={fmt(a.balance)} />
+                    ))}
+                  </View>
+                )}
               </Card>
             )}
 

@@ -15,17 +15,15 @@ import {
   selectTotalUsage,
   type Card,
 } from "@/store/cardStore";
-import { fmt } from "@/utils/formatters";
+import { fmt, fmtShort } from "@/utils/formatters";
+import { useAmountVisibilitySync } from "@/store/prefsStore";
 
 // Per-card accent, assigned by position so the carousel stays colourful.
 const ACCENTS = ["#a855f7", "#3b82f6", "#10b981", "#f59e0b", "#ec4899"];
 const accentFor = (i: number) => ACCENTS[i % ACCENTS.length];
 
-function fmtShort(n: number) {
-  return n >= 1_00_000 ? `₹${(n / 1_00_000).toFixed(1)}L` : `₹${(n / 1000).toFixed(0)}K`;
-}
-
 export default function CardsScreen() {
+  useAmountVisibilitySync();
   const store = useCardStore();
   const cards = store.cards;
   const totalLimit = selectTotalLimit(store);
@@ -151,20 +149,9 @@ export default function CardsScreen() {
                   </View>
                 </View>
                 <View className="h-px bg-white/[0.08]" />
-                <View className="flex-row items-end justify-between">
-                  <View>
-                    <Text className="text-[11px] text-muted mb-1">Outstanding</Text>
-                    <Text className="text-[22px] font-extrabold text-accent-red">{fmt(card.usage)}</Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => router.push(`/add-card?id=${card.id}`)}
-                    className="flex-row items-center gap-[6px] px-[14px] py-2 rounded-full border border-white/[0.12]"
-                    style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
-                    activeOpacity={0.75}
-                  >
-                    <Ionicons name="create-outline" size={16} color="#9ca3af" />
-                    <Text className="text-[13px] text-secondary font-semibold">Edit</Text>
-                  </TouchableOpacity>
+                <View>
+                  <Text className="text-[11px] text-muted mb-1">Outstanding</Text>
+                  <Text className="text-[22px] font-extrabold text-accent-red">{fmt(card.usage)}</Text>
                 </View>
               </View>
 
@@ -211,11 +198,9 @@ export default function CardsScreen() {
               {cards.map((c, i) => {
                 const a = accentFor(i);
                 return (
-                  <TouchableOpacity
+                  <View
                     key={c.id}
-                    onPress={() => router.push(`/add-card?id=${c.id}`)}
                     className="flex-row items-center gap-3 bg-white/[0.05] rounded-[14px] p-[14px] border border-white/[0.08]"
-                    activeOpacity={0.75}
                   >
                     <View
                       className="w-[46px] h-[46px] rounded-[13px] items-center justify-center"
@@ -235,8 +220,7 @@ export default function CardsScreen() {
                       </Text>
                       <Text className="text-[11px] text-dim">/ {fmt(c.limit)}</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={16} color="#4b5563" />
-                  </TouchableOpacity>
+                  </View>
                 );
               })}
             </View>

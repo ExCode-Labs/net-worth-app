@@ -10,6 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useAccountStore, selectTotalAssets, type Asset } from "@/store/accountStore";
 import { fmt } from "@/utils/formatters";
+import { useAmountVisibilitySync } from "@/store/prefsStore";
 
 export const ASSET_TYPES: Record<string, { label: string; icon: React.ComponentProps<typeof Ionicons>["name"] }> = {
   mutual_fund: { label: "Mutual Fund",       icon: "trending-up-outline"      },
@@ -79,6 +80,7 @@ function AssetRow({ asset: a, dim }: { asset: Asset; dim?: boolean }) {
 }
 
 export default function AssetsScreen() {
+  useAmountVisibilitySync();
   const store  = useAccountStore();
   const assets = store.assets;
 

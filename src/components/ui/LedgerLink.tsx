@@ -14,6 +14,7 @@ import { Sheet, SheetFlatList } from "@/components/ui/Sheet";
 import { useAccountStore, accountLabel, CASH_ACCOUNT, type Account } from "@/store/accountStore";
 import { useTransactionStore, type Transaction } from "@/store/transactionStore";
 import { fmt } from "@/utils/formatters";
+import { useAmountVisibilitySync } from "@/store/prefsStore";
 
 /** Human label for a stored account ref ("cash" / account id / unset). */
 export function accountRefLabel(accounts: Account[], accountId?: string): string {
@@ -41,6 +42,7 @@ export function LedgerLink({
   txnId?: string;
   onChange: (next: { accountId?: string; txnId?: string }) => void;
 }) {
+  useAmountVisibilitySync();
   const accounts = useAccountStore((s) => s.accounts);
   const linkedTx = useTransactionStore((s) => s.transactions.find((t) => t.id === txnId));
   const [picking, setPicking] = useState(false);

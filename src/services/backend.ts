@@ -31,6 +31,8 @@ export interface MeDto {
   guestName: string | null;
   onboarded: boolean;
   hasVaultPin: boolean;
+  hasPassword: boolean;
+  twoFactorEnabled: boolean;
 }
 
 export interface Bootstrap {
@@ -71,6 +73,7 @@ export async function updateMe(patch: {
   lastName?: string;
   fullName?: string;
   avatarUrl?: string;
+  twoFactorEnabled?: boolean;
 }): Promise<MeDto | void> {
   if (!apiEnabled) return;
   try {
@@ -117,6 +120,14 @@ export function syncCreate(resource: Resource, entity: { id: string }) {
   if (!apiEnabled) return;
   _syncQueue.push(() => apiPost(`/${resource}`, { id: entity.id, data: entity }));
   void _drainSync();
+}
+
+/** Upsert a collection of entities in one server round-trip. Used by the startup reconcile. */
+export async function syncBulk(
+  entities: Array<{ resource: Resource; id: string; data: object }>,
+): Promise<void> {
+  if (!apiEnabled || entities.length === 0) return;
+  await apiPost("/bulk", { entities }).catch(markDirty);
 }
 
 export function pushUpdate(resource: Resource, id: string, updates: object) {

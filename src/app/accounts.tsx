@@ -14,6 +14,7 @@ import {
   selectTotalBalance,
 } from "@/store/accountStore";
 import { fmt } from "@/utils/formatters";
+import { useAmountVisibilitySync } from "@/store/prefsStore";
 
 const TYPE_META: Record<string, { label: string; icon: React.ComponentProps<typeof Ionicons>["name"] }> = {
   bank:   { label: "Bank",   icon: "business-outline"       },
@@ -23,6 +24,7 @@ const TYPE_META: Record<string, { label: string; icon: React.ComponentProps<type
 };
 
 export default function AccountsScreen() {
+  useAmountVisibilitySync();
   const store    = useAccountStore();
   const accounts = store.accounts;
   const total    = selectTotalBalance(store);
@@ -92,10 +94,8 @@ export default function AccountsScreen() {
               const last4 = accountLast4(a);
               const title = a.accountName?.trim() || a.nickname?.trim() || a.bank;
               return (
-                <TouchableOpacity
+                <View
                   key={a.id}
-                  onPress={() => router.push(`/add-account?id=${a.id}`)}
-                  activeOpacity={0.7}
                   className="flex-row items-center gap-[14px] rounded-2xl border border-white/[0.08] p-4"
                   style={{ backgroundColor: "rgba(255,255,255,0.05)" }}
                 >
@@ -115,8 +115,7 @@ export default function AccountsScreen() {
                   <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>
                     {fmt(a.balance)}
                   </Text>
-                  <Ionicons name="chevron-forward" size={16} color="#4b5563" />
-                </TouchableOpacity>
+                </View>
               );
             })}
           </View>

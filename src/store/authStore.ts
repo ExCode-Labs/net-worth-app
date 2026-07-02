@@ -155,7 +155,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       storage.set(KEY_ACCESS_TOKEN, accessToken),
       storage.set(KEY_REFRESH_TOKEN, refreshToken),
     ]);
-    set({ accessToken, refreshToken, isSignedIn: true, isGuest: false });
+    set({ accessToken, refreshToken, isSignedIn: true, isGuest: false, isBootstrapped: false });
   },
 
   updateAccessToken: async (accessToken, refreshToken) => {

@@ -10,14 +10,19 @@ import type React from "react";
 import * as Crypto from "expo-crypto";
 import type { Ionicons } from "@expo/vector-icons";
 import { apiGet, apiPost, apiPut, apiDelete } from "@/services/api";
+import { useUserStore } from "@/store/userStore";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
-export const SHARE_CATEGORIES: { key: string; label: string; icon: IconName }[] = [
-  { key: "balance",     label: "Bank Balance",       icon: "wallet-outline" },
-  { key: "cards",       label: "Card Usage",         icon: "card-outline" },
-  { key: "assets",      label: "Assets",             icon: "trending-up-outline" },
-  { key: "liabilities", label: "Liabilities",        icon: "trending-down-outline" },
+export const SHARE_CATEGORIES: {
+  key: string;
+  label: string;
+  icon: IconName;
+}[] = [
+  { key: "balance", label: "Bank Balance", icon: "wallet-outline" },
+  { key: "cards", label: "Card Usage", icon: "card-outline" },
+  { key: "assets", label: "Assets", icon: "trending-up-outline" },
+  { key: "liabilities", label: "Liabilities", icon: "trending-down-outline" },
 ];
 
 // ── Phone hashing (mirror of api/src/common/phone.ts) ─────────────────────────
@@ -25,70 +30,118 @@ export function normalizePhone(raw: string): string {
   return raw.replace(/\D/g, "").slice(-10);
 }
 export function hashPhone(raw: string): Promise<string> {
-  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, normalizePhone(raw));
+  return Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    normalizePhone(raw),
+  );
 }
 
 // ── Lazy contacts module (degrades if not built in) ───────────────────────────
 type ContactsMod = typeof import("expo-contacts");
-let contacts: ContactsMod | null = null;
+let contactsMod: ContactsMod | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  contacts = require("expo-contacts") as ContactsMod;
+  contactsMod = require("expo-contacts") as ContactsMod;
 } catch {
-  contacts = null;
+  contactsMod = null;
 }
-export const contactsAvailable = !!contacts;
+export const contactsAvailable = !!contactsMod;
 
 export interface AppUser {
   id: string;
-  name: string;          // server display name
+  name: string; // server display name
   avatarUrl: string | null;
   phoneHash: string;
-  contactName?: string;  // local address-book name, if matched
+  contactName?: string; // local address-book name, if matched
+}
+
+export interface InviteContact {
+  name: string;
+  phone: string;
 }
 
 /**
  * Read contacts, hash their numbers, and ask the backend which are registered
- * users. Returns matched app users with the local contact name attached.
+ * users. Returns matched app users + non-matched contacts for invite.
  */
-export async function discoverFromContacts(): Promise<{ status: "ok" | "denied" | "unavailable"; users: AppUser[] }> {
-  if (!contacts) return { status: "unavailable", users: [] };
-  const { status } = await contacts.requestPermissionsAsync();
-  if (status !== "granted") return { status: "denied", users: [] };
+export async function discoverFromContacts(): Promise<{
+  status: "ok" | "denied" | "unavailable";
+  users: AppUser[];
+  invitable: InviteContact[];
+}> {
+  if (!contactsMod) return { status: "unavailable", users: [], invitable: [] };
+  const { Contact, ContactField, requestPermissionsAsync } = contactsMod;
 
-  const { data } = await contacts.getContactsAsync({
-    fields: [contacts.Fields.PhoneNumbers, contacts.Fields.Name],
-  });
+  const { status } = await requestPermissionsAsync();
+  if (status !== "granted")
+    return { status: "denied", users: [], invitable: [] };
 
-  // Map each hashed number → contact name so we can label matches.
-  const hashToName = new Map<string, string>();
-  for (const c of data) {
-    for (const p of c.phoneNumbers ?? []) {
+  const allContacts = await Contact.getAllDetails(
+    [ContactField.PHONES, ContactField.GIVEN_NAME, ContactField.FAMILY_NAME, ContactField.FULL_NAME] as const,
+  );
+
+  const myPhone = useUserStore.getState().phone;
+  const myHash = myPhone ? await hashPhone(myPhone) : null;
+
+  // hash → { name, phone } for all device contacts
+  const hashToContact = new Map<string, InviteContact>();
+  for (const c of allContacts) {
+    const displayName =
+      c.fullName || [c.givenName, c.familyName].filter(Boolean).join(" ") || "";
+    for (const p of c.phones ?? []) {
       if (!p.number) continue;
       const h = await hashPhone(p.number);
-      if (!hashToName.has(h)) hashToName.set(h, c.name ?? "");
+      if (h !== myHash && !hashToContact.has(h))
+        hashToContact.set(h, { name: displayName, phone: p.number });
     }
   }
-  const hashes = [...hashToName.keys()];
-  if (hashes.length === 0) return { status: "ok", users: [] };
+
+  const hashes = [...hashToContact.keys()];
+  if (hashes.length === 0) return { status: "ok", users: [], invitable: [] };
 
   const matched = await apiPost<AppUser[]>("/share/discover", { hashes });
-  return {
-    status: "ok",
-    users: matched.map((u) => ({ ...u, contactName: hashToName.get(u.phoneHash) || undefined })),
-  };
+  const matchedHashes = new Set(matched.map((u) => u.phoneHash));
+
+  const users = matched.map((u) => ({
+    ...u,
+    contactName: hashToContact.get(u.phoneHash)?.name || undefined,
+  }));
+
+  const seenNames = new Set<string>();
+  const invitable: InviteContact[] = [];
+  for (const [h, c] of hashToContact) {
+    if (matchedHashes.has(h) || !c.name || seenNames.has(c.name)) continue;
+    seenNames.add(c.name);
+    invitable.push(c);
+  }
+  invitable.sort((a, b) => a.name.localeCompare(b.name));
+
+  return { status: "ok", users, invitable };
 }
 
 // ── Share management ──────────────────────────────────────────────────────────
+/** Per-category selected item IDs. A category absent here = share all of it. */
+export type ShareItems = Record<string, string[]>;
+
 export interface OutgoingShare {
   id: string;
   recipient: { id: string; name: string; avatarUrl: string | null };
   categories: string[];
+  items?: ShareItems;
 }
 export interface IncomingShare {
   owner: { id: string; name: string; avatarUrl: string | null };
   categories: string[];
 }
+
+/**
+ * In-memory cache of the sharing lists so re-opening the Sharing screen shows
+ * data instantly instead of a spinner. MUST be cleared on sign-out (see
+ * resetShareCache in clearAllDataStores) or one account's shares leak into the
+ * next account's session.
+ */
+export const shareCache: { data: { out: OutgoingShare[]; inc: IncomingShare[] } | null } = { data: null };
+export function resetShareCache() { shareCache.data = null; }
 
 export function listOutgoing() {
   return apiGet<OutgoingShare[]>("/share/out");
@@ -96,8 +149,8 @@ export function listOutgoing() {
 export function listIncoming() {
   return apiGet<IncomingShare[]>("/share/in");
 }
-export function upsertShare(recipientId: string, categories: string[]) {
-  return apiPut<unknown>("/share/out", { recipientId, categories });
+export function upsertShare(recipientId: string, categories: string[], items?: ShareItems) {
+  return apiPut<unknown>("/share/out", { recipientId, categories, items });
 }
 export function revokeShare(recipientId: string) {
   return apiDelete<unknown>(`/share/out/${recipientId}`);
@@ -106,10 +159,20 @@ export function revokeShare(recipientId: string) {
 export interface SharedData {
   owner: { id: string; name: string; avatarUrl: string | null } | null;
   categories: string[];
-  balance?: { total: number; accounts: number };
+  balance?: {
+    total: number;
+    accounts: number;
+    items: { name: string; bank: string; balance: number }[];
+  };
   cards?: { cardName: string; bank: string; limit: number; usage: number }[];
-  assets?: { total: number; items: { name: string; type: string; value: number }[] };
-  liabilities?: { total: number; items: { name: string; type: string; balance: number }[] };
+  assets?: {
+    total: number;
+    items: { name: string; type: string; value: number }[];
+  };
+  liabilities?: {
+    total: number;
+    items: { name: string; type: string; balance: number }[];
+  };
 }
 export function fetchSharedData(ownerId: string) {
   return apiGet<SharedData>(`/share/in/${ownerId}`);

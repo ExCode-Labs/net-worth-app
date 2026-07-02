@@ -1,3 +1,4 @@
+import React, { memo } from "react";
 import { Tabs } from "expo-router";
 import { Pressable, View, type PressableProps, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,19 +26,23 @@ const styles = StyleSheet.create({
     transform: [{ translateY: -5 }],
   },
   fab: {
-    // Halo border — matches tab bar bg to create floating gap
     borderWidth: 3,
     borderColor: "#0d1225",
-    // Glow
     shadowColor: "#a855f7",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.6,
     shadowRadius: 10,
     elevation: 10,
   },
+  tabIconFocused: {
+    backgroundColor: "rgba(168,85,247,0.12)",
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
 });
 
-function TabIcon({
+const TabIcon = memo(function TabIcon({
   name,
   focused,
 }: {
@@ -45,28 +50,19 @@ function TabIcon({
   focused: boolean;
 }) {
   return (
-    <View
-      style={
-        focused
-          ? {
-              backgroundColor: "rgba(168,85,247,0.12)",
-              borderRadius: 10,
-              paddingHorizontal: 4,
-              paddingVertical: 2,
-            }
-          : undefined
-      }
-    >
+    <View style={focused ? styles.tabIconFocused : undefined}>
       <Ionicons name={name} size={22} color={focused ? "#a855f7" : "#4b5563"} />
     </View>
   );
-}
+});
 
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
+        lazy: false,
+        animation: "none",
         tabBarStyle: {
           backgroundColor: "#0d1225",
           borderTopColor: "rgba(255,255,255,0.08)",

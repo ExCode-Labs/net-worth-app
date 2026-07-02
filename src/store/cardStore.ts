@@ -23,7 +23,7 @@ export interface Card {
   billCycle:        string;   // statement generation day of month, e.g. "5"
   dueDate?:         string;   // payment due day of month, e.g. "25"
   number?:          string;   // full PAN — stripped from bootstrap, served only via GET /vault
-  cardHolder?:      string;   // name on card — stripped from bootstrap, served only via GET /vault
+  cardHolder?:      string;   // name on card — included in bootstrap (not sensitive)
   network?:         string;   // "Visa" | "Mastercard" | "RuPay" | "Amex"
   last4:            string;   // last 4 digits of the card (always shown)
   expiry:           string;   // MM/YY

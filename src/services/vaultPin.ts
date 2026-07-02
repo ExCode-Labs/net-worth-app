@@ -12,10 +12,15 @@ export async function setupVaultPin(pin: string): Promise<void> {
   await apiPost("/auth/vault/setup", { pinHash });
 }
 
-export async function verifyVaultPin(pin: string): Promise<boolean> {
+export interface VaultVerifyResult {
+  ok: boolean;
+  attemptsLeft: number;
+  lockedUntil: number | null;
+}
+
+export async function verifyVaultPin(pin: string): Promise<VaultVerifyResult> {
   const pinHash = await hashPin(pin);
-  const result = await apiPost<{ ok: boolean }>("/auth/vault/verify", { pinHash });
-  return result.ok;
+  return apiPost<VaultVerifyResult>("/auth/vault/verify", { pinHash });
 }
 
 export async function requestVaultPinReset(): Promise<void> {

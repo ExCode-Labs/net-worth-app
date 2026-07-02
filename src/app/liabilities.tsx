@@ -11,6 +11,7 @@ import { router } from "expo-router";
 import { useLiabilityStore, selectTotalLiabilities, type Liability } from "@/store/liabilityStore";
 import { useCardStore, selectTotalUsage, cardLast4 } from "@/store/cardStore";
 import { fmt } from "@/utils/formatters";
+import { useAmountVisibilitySync } from "@/store/prefsStore";
 
 export const LIABILITY_TYPES: Record<string, { label: string; icon: React.ComponentProps<typeof Ionicons>["name"] }> = {
   loan:     { label: "Loan",       icon: "cash-outline"              },
@@ -56,6 +57,7 @@ function LiabilityRow({ liability: l, dim }: { liability: Liability; dim?: boole
 }
 
 export default function LiabilitiesScreen() {
+  useAmountVisibilitySync();
   const store       = useLiabilityStore();
   const liabilities = store.liabilities;
 

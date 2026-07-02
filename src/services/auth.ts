@@ -25,9 +25,12 @@ function requireApi() {
 
 // ── Sign-in ───────────────────────────────────────────────────────────────────
 
-export async function emailLogin(email: string, password: string): Promise<void> {
+export async function emailLogin(
+  email: string,
+  password: string,
+): Promise<SessionResult | { twoFactor: true }> {
   requireApi();
-  await apiPost("/auth/email/login", { email, password });
+  return apiPost<SessionResult | { twoFactor: true }>("/auth/email/login", { email, password });
 }
 
 // ── Sign-up ───────────────────────────────────────────────────────────────────
@@ -83,13 +86,15 @@ export async function finishLogin(result: SessionResult): Promise<void> {
   const { user } = result;
   const store = useUserStore.getState();
   useUserStore.setState({
-    guestName: user.firstName ?? user.fullName ?? store.guestName,
-    phone:     user.phone ?? store.phone,
-    firstName: user.firstName,
-    lastName:  user.lastName,
-    fullName:  user.fullName,
-    email:     user.email,
-    avatarUrl: user.avatarUrl,
+    guestName:        user.firstName ?? user.fullName ?? store.guestName,
+    phone:            user.phone ?? store.phone,
+    firstName:        user.firstName,
+    lastName:         user.lastName,
+    fullName:         user.fullName,
+    email:            user.email,
+    avatarUrl:        user.avatarUrl,
+    hasPassword:      user.hasPassword ?? false,
+    twoFactorEnabled: user.twoFactorEnabled ?? false,
   });
 }
 

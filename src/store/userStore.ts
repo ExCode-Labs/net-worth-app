@@ -41,36 +41,42 @@ function uuidV4(): string {
 
 interface UserStore {
   deviceId:  string | null;
+  userId:    string | null; // server-assigned ID — used to detect account switches on login
   guestName: string | null;
   phone:     string | null; // mandatory; used for sharing discovery
 
   // Authenticated user profile (populated from backend on login + each sync)
-  firstName:   string | null;
-  lastName:    string | null;
-  fullName:    string | null;
-  email:       string | null;
-  avatarUrl:   string | null;
-  hasVaultPin: boolean;
+  firstName:        string | null;
+  lastName:         string | null;
+  fullName:         string | null;
+  email:            string | null;
+  avatarUrl:        string | null;
+  hasVaultPin:      boolean;
+  hasPassword:      boolean;
+  twoFactorEnabled: boolean;
 
   hydrateDeviceId: () => Promise<void>;
   setGuestName:    (name: string) => void;
   /** Alias used by setup.tsx — delegates to setGuestName */
   setName:         (name: string) => void;
   setPhone:        (phone: string) => void;
-  setProfile:      (p: { firstName?: string | null; lastName?: string | null; fullName?: string | null; email?: string | null; avatarUrl?: string | null; hasVaultPin?: boolean }) => void;
+  setProfile:      (p: { firstName?: string | null; lastName?: string | null; fullName?: string | null; email?: string | null; avatarUrl?: string | null; hasVaultPin?: boolean; hasPassword?: boolean; twoFactorEnabled?: boolean }) => void;
   reset:           () => void;
 }
 
 export const useUserStore = create<UserStore>((set) => ({
-  deviceId:    null,
-  guestName:   null,
-  phone:       null,
-  firstName:   null,
-  lastName:    null,
-  fullName:    null,
-  email:       null,
-  avatarUrl:   null,
-  hasVaultPin: false,
+  deviceId:         null,
+  userId:           null,
+  guestName:        null,
+  phone:            null,
+  firstName:        null,
+  lastName:         null,
+  fullName:         null,
+  email:            null,
+  avatarUrl:        null,
+  hasVaultPin:      false,
+  hasPassword:      false,
+  twoFactorEnabled: false,
 
   hydrateDeviceId: async () => {
     let id = await storage.get(KEY_DEVICE_ID);
@@ -93,5 +99,5 @@ export const useUserStore = create<UserStore>((set) => ({
 
   setProfile: (p) => set(p),
 
-  reset: () => set({ guestName: null, firstName: null, lastName: null, fullName: null, email: null, avatarUrl: null }), // deviceId + phone kept
+  reset: () => set({ userId: null, guestName: null, firstName: null, lastName: null, fullName: null, email: null, avatarUrl: null, hasVaultPin: false, hasPassword: false, twoFactorEnabled: false }), // deviceId + phone kept
 }));

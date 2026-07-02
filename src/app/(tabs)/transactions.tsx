@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -23,12 +23,14 @@ import {
   requestNotificationAccess,
 } from "@/services/notificationListener";
 import { fmt } from "@/utils/formatters";
+import { useAmountVisibilitySync } from "@/store/prefsStore";
 
 type Filter = "All" | "Expense" | "Income" | "Transfer";
 const FILTERS: Filter[] = ["All", "Expense", "Income", "Transfer"];
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function TransactionsScreen() {
+  useAmountVisibilitySync();
   const [filter,      setFilter]      = useState<Filter>("All");
   const [search,      setSearch]      = useState("");
   const [filterOpen,  setFilterOpen]  = useState(false);
@@ -52,31 +54,35 @@ export default function TransactionsScreen() {
 
   const hasReal = transactions.length > 0;
 
-  const confirmed = transactions.filter((t) => t.status === "confirmed");
-  const linked: typeof confirmed = [];
-  const orphanAccounts: typeof confirmed = [];
-  const orphanCards: typeof confirmed = [];
-  for (const t of confirmed) {
-    if (t.account.startsWith("Card ")) {
-      (isOrphanCardTransaction(cards, t) ? orphanCards : linked).push(t);
-    } else {
-      (isOrphanTransaction(accounts, t) ? orphanAccounts : linked).push(t);
+  const { linked, orphanAccounts, orphanCards } = useMemo(() => {
+    const confirmed = transactions.filter((t) => t.status === "confirmed");
+    const linked: typeof confirmed = [];
+    const orphanAccounts: typeof confirmed = [];
+    const orphanCards: typeof confirmed = [];
+    for (const t of confirmed) {
+      if (t.account.startsWith("Card ")) {
+        (isOrphanCardTransaction(cards, t) ? orphanCards : linked).push(t);
+      } else {
+        (isOrphanTransaction(accounts, t) ? orphanAccounts : linked).push(t);
+      }
     }
-  }
+    return { linked, orphanAccounts, orphanCards };
+  }, [transactions, accounts, cards]);
 
-  const distinctTargets = (rows: typeof confirmed) =>
-    Array.from(
-      new Map(
-        rows.map((t) => {
-          const last4 = t.account.replace(/\D/g, "").slice(-4);
-          return [`${t.bank}|${last4}`, { bank: t.bank || "Unknown bank", last4 }];
-        }),
-      ).values(),
-    );
-  const missingAccounts = distinctTargets(orphanAccounts);
-  const missingCards    = distinctTargets(orphanCards);
+  const { missingAccounts, missingCards } = useMemo(() => {
+    const distinctTargets = (rows: typeof orphanAccounts) =>
+      Array.from(
+        new Map(
+          rows.map((t) => {
+            const last4 = t.account.replace(/\D/g, "").slice(-4);
+            return [`${t.bank}|${last4}`, { bank: t.bank || "Unknown bank", last4 }];
+          }),
+        ).values(),
+      );
+    return { missingAccounts: distinctTargets(orphanAccounts), missingCards: distinctTargets(orphanCards) };
+  }, [orphanAccounts, orphanCards]);
 
-  const displayList = linked.map((t) => ({
+  const displayList = useMemo(() => linked.map((t) => ({
     id:     t.id,
     icon:   "receipt-outline" as const,
     name:   t.merchant,
@@ -87,36 +93,41 @@ export default function TransactionsScreen() {
     time:   new Date(t.date).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
     date:   new Date(t.date).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" }),
     type:   t.type,
-  }));
+  })), [linked]);
 
-  const filtered = displayList.filter(
+  const filtered = useMemo(() => displayList.filter(
     (t) =>
       (filter === "All" || t.type === filter) &&
       (!search ||
         t.name.toLowerCase().includes(search.toLowerCase()) ||
         t.cat.toLowerCase().includes(search.toLowerCase()) ||
         String(Math.abs(t.amount)).includes(search)),
-  );
+  ), [displayList, filter, search]);
 
-  const groups: Record<string, typeof filtered> = {};
-  filtered.forEach((t) => { (groups[t.date] ??= []).push(t); });
+  const { groups, totalExpense, totalIncome, dayTotals } = useMemo(() => {
+    const spend = filtered.filter((t) => t.type !== "Transfer");
+    const totalExpense = spend.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+    const totalIncome  = spend.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+    const groups: Record<string, typeof filtered> = {};
+    filtered.forEach((t) => { (groups[t.date] ??= []).push(t); });
+    const dayTotals = new Map<string, DayTotal>();
+    spend.forEach((t) => {
+      const k   = dayKey(new Date(t.iso));
+      const cur = dayTotals.get(k) ?? { income: 0, expense: 0 };
+      if (t.amount < 0) cur.expense += Math.abs(t.amount);
+      else cur.income += t.amount;
+      dayTotals.set(k, cur);
+    });
+    return { groups, totalExpense, totalIncome, dayTotals };
+  }, [filtered]);
 
-  const spend        = filtered.filter((t) => t.type !== "Transfer");
-  const totalExpense = spend.filter((t) => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
-  const totalIncome  = spend.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-
-  const dayTotals = new Map<string, DayTotal>();
-  spend.forEach((t) => {
-    const k   = dayKey(new Date(t.iso));
-    const cur = dayTotals.get(k) ?? { income: 0, expense: 0 };
-    if (t.amount < 0) cur.expense += Math.abs(t.amount);
-    else cur.income += t.amount;
-    dayTotals.set(k, cur);
-  });
-  const selKey    = dayKey(selectedDay);
-  const dayList   = filtered.filter((t) => dayKey(new Date(t.iso)) === selKey);
-  const dayExpense = dayList.filter((t) => t.type !== "Transfer" && t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
-  const dayIncome  = dayList.filter((t) => t.type !== "Transfer" && t.amount > 0).reduce((s, t) => s + t.amount, 0);
+  const { dayList, dayExpense, dayIncome } = useMemo(() => {
+    const selKey = dayKey(selectedDay);
+    const dayList = filtered.filter((t) => dayKey(new Date(t.iso)) === selKey);
+    const dayExpense = dayList.filter((t) => t.type !== "Transfer" && t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+    const dayIncome  = dayList.filter((t) => t.type !== "Transfer" && t.amount > 0).reduce((s, t) => s + t.amount, 0);
+    return { dayList, dayExpense, dayIncome };
+  }, [filtered, selectedDay]);
 
   const showEnablePrompt =
     Platform.OS === "android" && notificationListenerAvailable && !accessGranted;
