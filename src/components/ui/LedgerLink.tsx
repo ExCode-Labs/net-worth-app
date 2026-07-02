@@ -168,30 +168,33 @@ function TxnPicker({
   }, [transactions, q]);
 
   return (
-    <Sheet visible={visible} onClose={onClose} snapPoints={["80%"]} keyboardAware>
-      {/* Header + search — fixed */}
-      <View className="flex-row items-center justify-between px-xl pt-2 pb-2">
-        <Text className="text-base font-bold text-white">Link a transaction</Text>
-        <TouchableOpacity onPress={onClose} hitSlop={8}>
-          <Ionicons name="close" size={22} color="#9ca3af" />
-        </TouchableOpacity>
-      </View>
-      <View className="px-xl pb-2">
-        <TextInput
-          value={q}
-          onChangeText={setQ}
-          placeholder="Search by merchant or amount"
-          placeholderTextColor="#374151"
-          className="rounded-[12px] px-4 py-3 text-sm text-white border border-white/10"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
-        />
-      </View>
-
+    // scrollable: the SheetFlatList must be the modal's direct child — the header
+    // and search live in ListHeaderComponent, else the list mis-measures. (#8)
+    <Sheet visible={visible} onClose={onClose} snapPoints={["80%"]} keyboardAware scrollable>
       <SheetFlatList
         data={results}
         keyExtractor={(t) => t.id}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 4, paddingBottom: 24 }}
+        stickyHeaderIndices={[0]}
+        ListHeaderComponent={
+          <View style={{ backgroundColor: "#0d1225", paddingTop: 8, paddingBottom: 8 }}>
+            <View className="flex-row items-center justify-between pb-2">
+              <Text className="text-base font-bold text-white">Link a transaction</Text>
+              <TouchableOpacity onPress={onClose} hitSlop={8}>
+                <Ionicons name="close" size={22} color="#9ca3af" />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              value={q}
+              onChangeText={setQ}
+              placeholder="Search by merchant or amount"
+              placeholderTextColor="#374151"
+              className="rounded-[12px] px-4 py-3 text-sm text-white border border-white/10"
+              style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
+            />
+          </View>
+        }
         ListEmptyComponent={
           <Text className="text-sm text-muted text-center py-8">No transactions found.</Text>
         }

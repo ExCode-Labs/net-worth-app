@@ -33,8 +33,8 @@ export function PersonField({
       if (!picked) return; // cancelled
       onChangeName(picked.name);
       onChangePhone(picked.phone);
-    } catch {
-      toast.error("Couldn't open contacts.");
+    } catch (e) {
+      toast.error(e instanceof Error && e.message ? e.message : "Couldn't open contacts.");
     }
   };
 

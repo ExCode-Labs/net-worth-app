@@ -48,7 +48,13 @@ export default function ShareConfigScreen() {
     const parsed = sel ? (JSON.parse(sel) as { categories: string[]; items: ShareItems }) : { categories: [], items: {} };
     const seed: Record<string, string[]> = {};
     for (const cat of parsed.categories) {
-      seed[cat] = parsed.items?.[cat] ?? (itemsByCat[cat] ?? []).map((it) => it.id);
+      const liveIds = new Set((itemsByCat[cat] ?? []).map((it) => it.id));
+      // Reconcile stored picks against live items — an account/asset deleted after
+      // the share was saved must not keep counting as shared (#19). A category with
+      // no stored item list is legacy "share all", so seed it with every live id.
+      seed[cat] = parsed.items?.[cat]
+        ? parsed.items[cat].filter((id) => liveIds.has(id))
+        : [...liveIds];
     }
     return seed;
   });

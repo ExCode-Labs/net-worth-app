@@ -1,0 +1,115 @@
+diff --git a/node_modules/react-native-android-notification-listener/android/src/main/java/com/lesimoes/androidnotificationlistener/RNAndroidNotificationListener.java b/node_modules/react-native-android-notification-listener/android/src/main/java/com/lesimoes/androidnotificationlistener/RNAndroidNotificationListener.java
+index 3fd4647..83bc5a0 100644
+--- a/node_modules/react-native-android-notification-listener/android/src/main/java/com/lesimoes/androidnotificationlistener/RNAndroidNotificationListener.java
++++ b/node_modules/react-native-android-notification-listener/android/src/main/java/com/lesimoes/androidnotificationlistener/RNAndroidNotificationListener.java
+@@ -8,12 +8,51 @@ import android.service.notification.StatusBarNotification;
+ import android.util.Log;
+ import android.app.Notification;
+ import com.google.gson.Gson;
++import java.util.ArrayList;
+ 
+ import com.facebook.react.HeadlessJsTaskService;
+ 
+ public class RNAndroidNotificationListener extends NotificationListenerService {
+     private static final String TAG = "RNAndroidNotificationListener";
+ 
++    // Live reference to the connected listener, used by the module's
++    // getActiveNotifications() to read the current shade. Null when not bound.
++    private static RNAndroidNotificationListener instance;
++
++    @Override
++    public void onListenerConnected() {
++        instance = this;
++    }
++
++    @Override
++    public void onListenerDisconnected() {
++        instance = null;
++    }
++
++    public static RNAndroidNotificationListener getInstance() {
++        return instance;
++    }
++
++    /** Serialize every notification currently in the shade, same shape as the
++     *  on-post payload. Returns an empty list if not connected or on error. */
++    public ArrayList<String> getSerializedActiveNotifications() {
++        ArrayList<String> out = new ArrayList<String>();
++        try {
++            StatusBarNotification[] active = getActiveNotifications();
++            if (active == null) return out;
++            Gson gson = new Gson();
++            Context context = getApplicationContext();
++            for (StatusBarNotification sbn : active) {
++                Notification n = sbn.getNotification();
++                if (n == null || n.extras == null) continue;
++                out.add(gson.toJson(new RNNotification(context, sbn)));
++            }
++        } catch (Exception e) {
++            Log.d(TAG, "getSerializedActiveNotifications failed: " + e.getMessage());
++        }
++        return out;
++    }
++
+     @Override
+     public void onNotificationPosted(StatusBarNotification sbn) {
+         Notification statusBarNotification = sbn.getNotification();
+diff --git a/node_modules/react-native-android-notification-listener/android/src/main/java/com/lesimoes/androidnotificationlistener/RNAndroidNotificationListenerModule.java b/node_modules/react-native-android-notification-listener/android/src/main/java/com/lesimoes/androidnotificationlistener/RNAndroidNotificationListenerModule.java
+index 2bd7b44..56e93ad 100644
+--- a/node_modules/react-native-android-notification-listener/android/src/main/java/com/lesimoes/androidnotificationlistener/RNAndroidNotificationListenerModule.java
++++ b/node_modules/react-native-android-notification-listener/android/src/main/java/com/lesimoes/androidnotificationlistener/RNAndroidNotificationListenerModule.java
+@@ -8,6 +8,8 @@ import com.facebook.react.bridge.ReactApplicationContext;
+ import com.facebook.react.bridge.ReactContextBaseJavaModule;
+ import com.facebook.react.bridge.ReactMethod;
+ import com.facebook.react.bridge.Promise;
++import com.facebook.react.bridge.Arguments;
++import com.facebook.react.bridge.WritableArray;
+ 
+ import java.util.Set;
+ 
+@@ -41,6 +43,25 @@ public class RNAndroidNotificationListenerModule extends ReactContextBaseJavaMod
+         }
+     }
+     
++    /** Return every notification currently in the shade, each as the same JSON
++     *  string the headless task receives. Empty if the listener isn't connected.
++     *  Lets JS re-scan for bank alerts missed while screen-sharing was active. */
++    @ReactMethod
++    public void getActiveNotifications(Promise promise) {
++        WritableArray result = Arguments.createArray();
++        try {
++            RNAndroidNotificationListener service = RNAndroidNotificationListener.getInstance();
++            if (service != null) {
++                for (String json : service.getSerializedActiveNotifications()) {
++                    result.pushString(json);
++                }
++            }
++        } catch (Exception e) {
++            // fall through with whatever we collected
++        }
++        promise.resolve(result);
++    }
++
+     @ReactMethod
+     public void requestPermission() {
+         if (this.reactContext != null) {
+diff --git a/node_modules/react-native-android-notification-listener/android/src/main/java/com/lesimoes/androidnotificationlistener/RNNotification.java b/node_modules/react-native-android-notification-listener/android/src/main/java/com/lesimoes/androidnotificationlistener/RNNotification.java
+index 81927cd..d97a2f9 100644
+--- a/node_modules/react-native-android-notification-listener/android/src/main/java/com/lesimoes/androidnotificationlistener/RNNotification.java
++++ b/node_modules/react-native-android-notification-listener/android/src/main/java/com/lesimoes/androidnotificationlistener/RNNotification.java
+@@ -20,6 +20,7 @@ import android.graphics.drawable.BitmapDrawable;
+ public class RNNotification {
+     private static final String TAG = "RNAndroidNotificationListener";
+     
++    protected String key;
+     protected String app;
+     protected String title;
+     protected String titleBig;
+@@ -42,6 +43,7 @@ public class RNNotification {
+             String packageName = sbn.getPackageName();
+ 
+             this.time = Long.toString(sbn.getPostTime());
++            this.key = sbn.getKey();
+             this.app = TextUtils.isEmpty(packageName) ? "Unknown App" : packageName;
+             this.title = this.getPropertySafely(notification, Notification.EXTRA_TITLE);
+             this.titleBig = this.getPropertySafely(notification, Notification.EXTRA_TITLE_BIG);

@@ -14,7 +14,6 @@ import {
   TextInput,
   ScrollView,
   KeyboardAvoidingView,
-  Platform,
   TouchableOpacity,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -95,7 +94,7 @@ export default function AddLiabilityScreen() {
     <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-cosmic-darker">
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior="padding"
         keyboardVerticalOffset={0}
       >
         {/* Header */}

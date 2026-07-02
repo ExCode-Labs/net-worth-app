@@ -20,9 +20,15 @@ export interface PickedContact {
 }
 
 /** Open the OS contact picker. Returns {name, phone}, or null if cancelled /
- *  unavailable. The native picker handles its own permission prompt. */
+ *  unavailable. Throws with a friendly message if contacts permission is denied. */
 export async function pickContact(): Promise<PickedContact | null> {
   if (!contacts) return null;
+  // presentPicker returns only a reference; reading name/phone off it queries the
+  // contacts DB, which needs READ_CONTACTS. The picker doesn't grant that, so
+  // request it first — else getPhones()/getGivenName() throw. (#7)
+  const { status } = await contacts.requestPermissionsAsync();
+  if (status !== "granted")
+    throw new Error("Contacts permission is needed to pick a contact.");
   const c = await contacts.Contact.presentPicker();
   if (!c) return null;
   const [givenName, familyName, phones] = await Promise.all([

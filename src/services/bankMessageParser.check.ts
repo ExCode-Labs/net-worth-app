@@ -37,6 +37,17 @@ eq(parseCardMessage("Rs.400 spent on SBI Card ending 1234 at AMAZON on 05-Jun-26
 // Generic fallbacks still work when no bank rule matches (VPA).
 eq(cp("Rs.90 debited A/c X1234 to someone@okaxis on 05-Jun-26"), "someone@okaxis", "generic VPA");
 
+// #1 time: the message's stated local date/time must round-trip through
+// occurredAt as local Date components, in ANY runner timezone (not UTC-shifted).
+{
+  const iso = parseBankMessage("Rs.500 debited A/c X1234 to JOHN on 05-Jun-26 14:30 Ref 1")?.occurredAt;
+  const d = iso ? new Date(iso) : null;
+  eq(d?.getHours(), 14, "occurredAt local hour");
+  eq(d?.getMinutes(), 30, "occurredAt local minute");
+  eq(d?.getDate(), 5, "occurredAt local date");
+  eq(d?.getMonth(), 5, "occurredAt local month (Jun=5)");
+}
+
 if (failures) throw new Error(`${failures} bankMessageParser check(s) failed`);
 
 console.log("bankMessageParser: all checks passed");

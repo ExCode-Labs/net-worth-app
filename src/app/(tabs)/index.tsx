@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,7 +10,7 @@ import { useTransactionStore } from "@/store/transactionStore";
 import { useCardStore, selectTotalLimit, selectTotalUsage } from "@/store/cardStore";
 import { useLiabilityStore, selectTotalLiabilities } from "@/store/liabilityStore";
 import { usePrefsStore } from "@/store/prefsStore";
-import { fmt, fmtShort, getGreeting } from "@/utils/formatters";
+import { fmt, fmtSigned, fmtShort, getGreeting } from "@/utils/formatters";
 import AiInsightsCard from "@/components/home/AiInsightsCard";
 import type { Transaction } from "@/store/transactionStore";
 
@@ -119,6 +119,9 @@ export default function HomeScreen() {
   const creditPct   = creditLimit > 0 ? Math.round((creditUsed / creditLimit) * 100) : 0;
 
   const expense = useMemo(() => buildMonthlyExpense(transactions), [transactions]);
+  // Which month bar is tapped in the mini chart (null = show the current month).
+  const [selExp, setSelExp] = useState<number | null>(null);
+  const shownExp = selExp != null ? expense.months[selExp] : expense.months[expense.months.length - 1];
   const recentTx = useMemo(
     () => transactions.filter((t) => t.status === "confirmed").slice(0, 4),
     [transactions],
@@ -163,12 +166,20 @@ export default function HomeScreen() {
             <View style={{ position: "absolute", top: -30, right: -20, width: 140, height: 140, borderRadius: 70, backgroundColor: "rgba(168,85,247,0.12)" }} pointerEvents="none" />
             <View className="flex-row justify-between items-center mb-3">
               <Text className="text-base text-secondary font-semibold tracking-wide">Total Net Worth</Text>
-              <Ionicons name="close-outline" size={20} color="#6b7280" />
+              <TouchableOpacity
+                onPress={() => router.push("/badge")}
+                hitSlop={8}
+                className="flex-row items-center gap-1 rounded-full border border-accent-purple/30 px-2.5 py-1"
+                style={{ backgroundColor: "rgba(168,85,247,0.14)" }}
+              >
+                <Ionicons name="ribbon-outline" size={13} color="#a855f7" />
+                <Text className="text-[11px] font-bold text-accent-purple">Badge</Text>
+              </TouchableOpacity>
             </View>
             <View className="flex-row justify-between items-end">
               <View className="flex-1">
                 <Text style={{ fontSize: 30, fontWeight: "800", color: "#fff", marginBottom: 8 }}>
-                  {fmt(netWorth)}
+                  {fmtSigned(netWorth)}
                 </Text>
                 {hasRealData ? (
                   <View className="flex-row items-center gap-1">
@@ -206,7 +217,7 @@ export default function HomeScreen() {
                 style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
               >
                 <Text className="text-xs text-muted mb-1.5">Total Balance</Text>
-                <Text className="text-xl font-bold text-white">{fmt(totalBalance)}</Text>
+                <Text className="text-xl font-bold text-white">{fmtSigned(totalBalance)}</Text>
               </View>
               <View
                 className="flex-1 rounded-[12px] p-[14px] border border-white/[0.08]"
@@ -234,7 +245,7 @@ export default function HomeScreen() {
 
             <View className="flex-row justify-between">
               <QuickAction icon="wallet-outline"        label="Accounts"    bg="rgba(59,130,246,0.25)" onPress={() => router.push("/accounts")} />
-              <QuickAction icon="card-outline"          label="Cards"       bg="rgba(168,85,247,0.25)" onPress={() => router.push("/analytics")} />
+              <QuickAction icon="card-outline"          label="Cards"       bg="rgba(168,85,247,0.25)" onPress={() => router.push("/cards")} />
               <QuickAction icon="trending-up-outline"   label="Assets"      bg="rgba(74,222,128,0.2)" onPress={() => router.push("/assets")} />
               <QuickAction icon="trending-down-outline" label="Liabilities" bg="rgba(248,113,113,0.2)" onPress={() => router.push("/liabilities")} />
             </View>
@@ -247,8 +258,15 @@ export default function HomeScreen() {
             className="rounded-[18px] border border-white/[0.08] p-[18px]"
             style={{ backgroundColor: "rgba(255,255,255,0.05)" }}
           >
-            <View className="flex-row justify-between items-center mb-[14px]">
-              <Text className="text-xl font-bold text-white">Monthly Expense</Text>
+            <TouchableOpacity
+              onPress={() => router.push("/analytics")}
+              activeOpacity={0.7}
+              className="flex-row justify-between items-center mb-[14px]"
+            >
+              <View className="flex-row items-center gap-1.5">
+                <Text className="text-xl font-bold text-white">Monthly Expense</Text>
+                <Ionicons name="chevron-forward" size={16} color="#6b7280" />
+              </View>
               {expense.changePct !== null && (
                 <View
                   className="flex-row items-center rounded-full px-2 py-[3px]"
@@ -267,11 +285,14 @@ export default function HomeScreen() {
                   </Text>
                 </View>
               )}
-            </View>
+            </TouchableOpacity>
             <Text style={{ fontSize: 28, fontWeight: "800", color: "#fff", marginBottom: 4 }}>
-              {fmt(expense.thisMonth)}
+              {fmt(shownExp.total)}
             </Text>
-            {expense.changePct !== null ? (
+            {/* Reads out the tapped month; falls back to the this-vs-last change. */}
+            {selExp != null ? (
+              <Text className="text-xs text-accent-purple mb-4 font-semibold">{shownExp.label} spending</Text>
+            ) : expense.changePct !== null ? (
               <Text
                 className="text-xs mb-4"
                 style={{ color: expense.changePct >= 0 ? "#f87171" : "#4ade80" }}
@@ -282,32 +303,44 @@ export default function HomeScreen() {
               <Text className="text-xs text-dim mb-4">No expenses recorded yet</Text>
             )}
 
-            <View className="flex-row items-end gap-2" style={{ height: 80 }}>
+            <View className="flex-row items-end gap-1" style={{ height: 100 }}>
               {expense.months.map((b, i) => {
                 const last = i === expense.months.length - 1;
-                const pct  = b.total / expense.max;
+                const active = selExp === i;
+                const pct  = expense.max > 0 ? b.total / expense.max : 0;
+                // Solid purple for the selected bar (or the current month when
+                // nothing is selected); the rest recede. One hue, height = magnitude.
+                const highlight = active || (selExp == null && last);
                 return (
-                  <View key={b.key} className="flex-1 items-center gap-1.5">
+                  <TouchableOpacity
+                    key={b.key}
+                    onPress={() => setSelExp(active ? null : i)}
+                    activeOpacity={0.7}
+                    className="flex-1 items-center gap-1.5"
+                  >
+                    {/* Track + fill. The fill is a fixed, narrow width centred in the
+                        column so bars read as bars, not blocks. */}
                     <View
-                      className="w-full rounded-[6px] justify-end overflow-hidden"
-                      style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.06)" }}
+                      className="w-full justify-end items-center overflow-hidden rounded-t-[6px]"
+                      style={{ flex: 1, backgroundColor: active ? "rgba(168,85,247,0.08)" : "transparent" }}
                     >
                       <View
                         style={{
-                          width: "100%",
-                          height: `${pct * 100}%`,
-                          borderRadius: 6,
-                          backgroundColor: last ? "#a855f7" : "rgba(168,85,247,0.3)",
+                          width: 16,
+                          height: `${Math.max(pct * 100, b.total > 0 ? 4 : 0)}%`,
+                          borderTopLeftRadius: 5,
+                          borderTopRightRadius: 5,
+                          backgroundColor: highlight ? "#a855f7" : "rgba(168,85,247,0.28)",
                         }}
                       />
                     </View>
                     <Text
                       className="text-[9px] font-semibold"
-                      style={{ color: last ? "#a855f7" : "#4b5563" }}
+                      style={{ color: highlight ? "#a855f7" : "#4b5563" }}
                     >
                       {b.label}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>

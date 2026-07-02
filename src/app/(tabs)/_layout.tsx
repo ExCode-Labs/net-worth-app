@@ -59,6 +59,9 @@ const TabIcon = memo(function TabIcon({
 export default function TabsLayout() {
   return (
     <Tabs
+      // Hardware back returns through the tabs you actually visited (and only
+      // exits from Home), instead of closing the app from any tab. (#2)
+      backBehavior="history"
       screenOptions={{
         headerShown: false,
         lazy: false,
@@ -117,7 +120,7 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="analytics"
+        name="cards"
         options={{
           title: "Cards",
           tabBarIcon: ({ focused }) => (

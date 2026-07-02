@@ -31,6 +31,7 @@ export function Sheet({
   onClose,
   snapPoints,
   keyboardAware = false,
+  scrollable = false,
   children,
 }: {
   visible:        boolean;
@@ -38,6 +39,10 @@ export function Sheet({
   snapPoints?:    (string | number)[];
   /** Set true when the sheet contains text inputs so the keyboard doesn't cover them. */
   keyboardAware?: boolean;
+  /** Set true when the child IS a SheetFlatList/SheetScrollView. It must be a
+   *  direct child of the modal — wrapping it in BottomSheetView breaks scroll and
+   *  measurement (list renders empty / untappable). */
+  scrollable?:    boolean;
   children:       React.ReactNode;
 }) {
   const ref = useRef<BottomSheetModal>(null);
@@ -79,7 +84,7 @@ export function Sheet({
         borderTopColor: C.border,
       }}
     >
-      <BottomSheetView>{children}</BottomSheetView>
+      {scrollable ? children : <BottomSheetView>{children}</BottomSheetView>}
     </BottomSheetModal>
   );
 }

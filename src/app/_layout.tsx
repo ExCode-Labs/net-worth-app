@@ -96,6 +96,15 @@ function RouteGate() {
     void useCurrencyStore.getState().fetchRates();
   }, []);
 
+  // Re-check notification access when the app returns to the foreground so a
+  // revocation done in system settings re-triggers the permission gate. (#6)
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") void useAuthStore.getState().refreshNotifAccess();
+    });
+    return () => sub.remove();
+  }, []);
+
   useEffect(() => {
     const inAuth = segments[0] === "(auth)";
     const subRoute = inAuth ? segments[1] : null;
@@ -104,9 +113,18 @@ function RouteGate() {
     if (!isHydrated) return;
     if (authed && !isBootstrapped) return;
 
-    // Require both notification access and battery optimization confirmation.
-    const needsPermissions = notifGateRequired &&
-      (notifAccess !== "authorized" || !batteryOptimDone);
+    // The permission gate applies to any signed-in user, not just during
+    // onboarding — if a user later revokes notification access they're sent back
+    // to the permissions screen. (#6)
+    //   • Onboarding: must actively grant access + confirm battery exemption.
+    //   • After onboarding: re-gate only on an explicit "denied". "unknown" is the
+    //     transient pre-refresh state, so treating it as missing would flash the
+    //     permissions screen on every cold start.
+    const needsPermissions = notifGateRequired && (
+      hasOnboarded
+        ? notifAccess === "denied"
+        : notifAccess !== "authorized" || !batteryOptimDone
+    );
 
     if (!authed) {
       if (!hasSeenWelcome) {
@@ -114,12 +132,10 @@ function RouteGate() {
       } else {
         if (subRoute !== "login") router.replace("/(auth)/login");
       }
+    } else if (needsPermissions) {
+      if (subRoute !== "permissions") router.replace("/(auth)/permissions");
     } else if (!hasOnboarded) {
-      if (needsPermissions) {
-        if (subRoute !== "permissions") router.replace("/(auth)/permissions");
-      } else if (subRoute !== "setup") {
-        router.replace("/(auth)/setup");
-      }
+      if (subRoute !== "setup") router.replace("/(auth)/setup");
     } else if (inAuth) {
       router.replace("/(tabs)");
     }
@@ -157,6 +173,8 @@ function RouteGate() {
       <Stack.Screen name="edit-transaction" />
       <Stack.Screen name="preferences" />
       <Stack.Screen name="ai-insights" />
+      <Stack.Screen name="badge" />
+      <Stack.Screen name="analytics" />
       <Stack.Screen name="security" />
       <Stack.Screen name="edit-profile" />
       <Stack.Screen name="sessions" />

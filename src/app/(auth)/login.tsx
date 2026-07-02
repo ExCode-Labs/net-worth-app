@@ -17,7 +17,6 @@ import {
   Text,
   TouchableOpacity,
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
   ActivityIndicator,
   TextInput,
@@ -145,12 +144,15 @@ export default function LoginScreen() {
         setOtp("");
         setStage("otp");
         toast.success("Code sent — check your email.");
+        setLoading(null); // staying on this screen for the OTP step
       } else {
         await finishLogin(result);
+        // Keep the button spinning until RouteGate navigates away once bootstrap
+        // finishes — resetting here leaves the screen idle for 1–2s, then it
+        // jumps. The spinner bridges that gap. (#17)
       }
     } catch (e) {
       toast.error(apiError(e));
-    } finally {
       setLoading(null);
     }
   };
@@ -185,9 +187,9 @@ export default function LoginScreen() {
     try {
       const result = await verifyEmailOtp(pendingEmail, otp);
       await finishLogin(result);
+      // keep spinning until RouteGate navigates (#17)
     } catch (e) {
       toast.error(apiError(e));
-    } finally {
       setLoading(null);
     }
   };
@@ -232,9 +234,9 @@ export default function LoginScreen() {
       const result = await resetPassword(pendingEmail, resetOtp, newPassword);
       await finishLogin(result);
       toast.success("Password updated! You're now signed in.");
+      // keep spinning until RouteGate navigates (#17)
     } catch (e) {
       toast.error(apiError(e));
-    } finally {
       setLoading(null);
     }
   };
@@ -246,14 +248,14 @@ export default function LoginScreen() {
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const response = await GoogleSignin.signIn();
       const idToken = response.data?.idToken;
-      if (!idToken) return; // user cancelled
+      if (!idToken) { setLoading(null); return; } // user cancelled
       const result = await loginWithGoogle(idToken);
       await finishLogin(result);
+      // keep spinning until RouteGate navigates (#17)
     } catch (e: unknown) {
+      setLoading(null);
       if (e && typeof e === "object" && "code" in e && e.code === statusCodes.SIGN_IN_CANCELLED) return;
       toast.error(apiError(e));
-    } finally {
-      setLoading(null);
     }
   };
 
@@ -262,9 +264,9 @@ export default function LoginScreen() {
     setLoading("guest");
     try {
       await continueAsGuest();
+      // keep spinning until RouteGate navigates (#17)
     } catch {
       toast.error("Could not start guest session.");
-    } finally {
       setLoading(null);
     }
   };
@@ -272,7 +274,7 @@ export default function LoginScreen() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView edges={["top", "bottom"]} className="flex-1 bg-cosmic-darker">
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         <ScrollView
           contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 24, paddingBottom: 32 }}
           showsVerticalScrollIndicator={false}

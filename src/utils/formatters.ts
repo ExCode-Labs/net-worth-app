@@ -27,6 +27,14 @@ export function fmt(n: number): string {
   return `${symbol}${amount.toLocaleString(locale, { maximumFractionDigits: decimals })}`;
 }
 
+/** Like fmt but keeps a leading minus for negative values — for raw aggregates
+ *  (net worth, total balance) that can legitimately go negative and are shown
+ *  without a caller-supplied sign. fmt() itself stays abs-only for the many call
+ *  sites that add their own +/− prefix. */
+export function fmtSigned(n: number): string {
+  return (n < 0 ? "−" : "") + fmt(n);
+}
+
 /** ₹1.2L · ₹4.5K · $1.2M (one decimal, trailing .0 trimmed; keeps sign).
  *  INR uses lakh (L); other currencies use million (M) — both fall back to K under 1000. */
 const trimDec = (v: number) => v.toFixed(1).replace(/\.0$/, "");

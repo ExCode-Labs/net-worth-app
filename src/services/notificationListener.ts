@@ -24,8 +24,11 @@ export interface RawNotification {
   title: string;
   /** Notification body text */
   text:  string;
-  /** Posted-at epoch ms (defaults to now if the OS doesn't provide it) */
+  /** Posted-at epoch ms (the OS post time; falls back to now) */
   time:  number;
+  /** Stable per-notification key (sbn.getKey). Used to guarantee a notification
+   *  is turned into a transaction at most once across the live + catch-up paths. */
+  key?:  string;
 }
 
 export type NotificationAccessStatus = "authorized" | "denied" | "unknown";
@@ -34,6 +37,10 @@ export type NotificationAccessStatus = "authorized" | "denied" | "unknown";
 type NativeListener = {
   getPermissionStatus: () => Promise<NotificationAccessStatus>;
   requestPermission:   () => void;
+  /** Added by our patch (patches/react-native-android-notification-listener+*).
+   *  Absent on older builds — callers must feature-detect. Returns each active
+   *  notification as the same JSON string the headless task receives. */
+  getActiveNotifications?: () => Promise<string[]>;
 };
 
 let native: NativeListener | null = null;
@@ -142,5 +149,32 @@ export function normalizeNativePayload(payload: unknown): RawNotification | null
   const text  = String(data.text ?? data.bigText ?? data.message ?? "");
   if (!text) return null;
 
-  return { app, title, text, time: Date.now() };
+  // Prefer the OS post time (serialized as a ms string) so a catch-up scan dates
+  // a recovered txn by when it actually arrived, not when we re-read it.
+  const posted = Number(data.time);
+  const time = Number.isFinite(posted) && posted > 0 ? posted : Date.now();
+  const key = typeof data.key === "string" && data.key ? data.key : undefined;
+
+  return { app, title, text, time, key };
+}
+
+/**
+ * Re-read every notification currently in the shade (Android only, requires our
+ * native patch). Used to recover bank alerts that arrived while the app was
+ * backgrounded or while screen-sharing redacted them. Returns [] when the method
+ * isn't present (older build) or the listener isn't connected.
+ */
+export async function getActiveNotificationsRaw(): Promise<RawNotification[]> {
+  if (!native || typeof native.getActiveNotifications !== "function") return [];
+  try {
+    const jsonList = await native.getActiveNotifications();
+    const out: RawNotification[] = [];
+    for (const json of jsonList) {
+      const n = normalizeNativePayload({ notification: json });
+      if (n) out.push(n);
+    }
+    return out;
+  } catch {
+    return [];
+  }
 }
