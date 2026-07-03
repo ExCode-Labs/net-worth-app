@@ -175,6 +175,7 @@ export default function LiabilityDetailScreen() {
         hint={`Record how you repaid ${liability.name || "this"}. Optional — skip to just mark it repaid.`}
         label="Repaid from"
         confirmLabel="Mark as Repaid"
+        amount={liability.balance}
         onClose={() => setSettling(false)}
         onConfirm={handleSettle}
       />

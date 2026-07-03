@@ -171,6 +171,7 @@ function RouteGate() {
       <Stack.Screen name="liability/[id]" />
       <Stack.Screen name="transaction/[id]" />
       <Stack.Screen name="edit-transaction" />
+      <Stack.Screen name="pick-transaction" />
       <Stack.Screen name="preferences" />
       <Stack.Screen name="ai-insights" />
       <Stack.Screen name="badge" />

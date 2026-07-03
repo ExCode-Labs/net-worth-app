@@ -367,6 +367,7 @@ export default function AssetForm({
           label={draft.type === "lent" ? "Paid from" : "Invested from"}
           accountId={draft.fromAccountId}
           txnId={draft.fromTxnId}
+          amount={assetValueOf(draft)}
           onChange={({ accountId, txnId }) => set({ fromAccountId: accountId, fromTxnId: txnId })}
         />
       )}

@@ -6,13 +6,15 @@
  * Used by the lent (AssetForm) and borrow (Add Liability) forms for the initial
  * leg, and by the asset/liability detail "settle" flow for the return leg.
  */
-import React, { useMemo, useState } from "react";
-import { View, Text, TextInput, TouchableOpacity } from "react-native";
+import React, { useState } from "react";
+import { View, Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { Chip } from "@/components/ui/Chip";
-import { Sheet, SheetFlatList } from "@/components/ui/Sheet";
+import { Sheet } from "@/components/ui/Sheet";
 import { useAccountStore, accountLabel, CASH_ACCOUNT, type Account } from "@/store/accountStore";
 import { useTransactionStore, type Transaction } from "@/store/transactionStore";
+import { usePickTxnStore } from "@/store/pickTxnStore";
 import { fmt } from "@/utils/formatters";
 import { useAmountVisibilitySync } from "@/store/prefsStore";
 
@@ -35,19 +37,28 @@ export function LedgerLink({
   label,
   accountId,
   txnId,
+  amount,
   onChange,
 }: {
   label: string;
   accountId?: string;
   txnId?: string;
+  /** Amount the linked txn should match — drives the picker's mismatch prompt. */
+  amount?: number;
   onChange: (next: { accountId?: string; txnId?: string }) => void;
 }) {
   useAmountVisibilitySync();
   const accounts = useAccountStore((s) => s.accounts);
   const linkedTx = useTransactionStore((s) => s.transactions.find((t) => t.id === txnId));
-  const [picking, setPicking] = useState(false);
 
   const select = (id: string) => onChange({ accountId: accountId === id ? undefined : id, txnId });
+
+  // Open the full-screen picker; it delivers the choice back through the store so
+  // this component (still mounted under the pushed screen) applies it.
+  const openPicker = () => {
+    usePickTxnStore.getState().request(amount ?? null, (id) => onChange({ accountId, txnId: id }));
+    router.push("/pick-transaction");
+  };
 
   return (
     <View className="gap-[10px]">
@@ -77,7 +88,7 @@ export function LedgerLink({
         </View>
       ) : (
         <TouchableOpacity
-          onPress={() => setPicking(true)}
+          onPress={openPicker}
           className="flex-row items-center gap-2 rounded-[12px] px-3 py-2.5 border border-white/10"
           style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
         >
@@ -85,12 +96,6 @@ export function LedgerLink({
           <Text className="text-xs text-muted">Link a transaction</Text>
         </TouchableOpacity>
       )}
-
-      <TxnPicker
-        visible={picking}
-        onClose={() => setPicking(false)}
-        onPick={(id) => { onChange({ accountId, txnId: id }); setPicking(false); }}
-      />
     </View>
   );
 }
@@ -102,13 +107,15 @@ export function LedgerLink({
  * an optional transaction link) before closing it.
  */
 export function SettleSheet({
-  visible, title, hint, label, confirmLabel, onClose, onConfirm,
+  visible, title, hint, label, confirmLabel, amount, onClose, onConfirm,
 }: {
   visible: boolean;
   title: string;
   hint: string;
   label: string;
   confirmLabel: string;
+  /** Amount being settled — passed to the picker for amount matching. */
+  amount?: number;
   onClose: () => void;
   onConfirm: (refs: { accountId?: string; txnId?: string }) => void;
 }) {
@@ -130,6 +137,7 @@ export function SettleSheet({
           label={label}
           accountId={accountId}
           txnId={txnId}
+          amount={amount}
           onChange={({ accountId: a, txnId: t }) => { setAccountId(a); setTxnId(t); }}
         />
 
@@ -146,81 +154,3 @@ export function SettleSheet({
   );
 }
 
-// ── Transaction picker modal ────────────────────────────────────────────────────
-function TxnPicker({
-  visible, onClose, onPick,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  onPick: (id: string) => void;
-}) {
-  const transactions = useTransactionStore((s) => s.transactions);
-  const [q, setQ] = useState("");
-
-  const results = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    const list = needle
-      ? transactions.filter((t) =>
-          (t.merchant + " " + t.category + " " + t.amount).toLowerCase().includes(needle),
-        )
-      : transactions;
-    return list.slice(0, 80); // ponytail: cap the list; add pagination if histories get huge
-  }, [transactions, q]);
-
-  return (
-    // scrollable: the SheetFlatList must be the modal's direct child — the header
-    // and search live in ListHeaderComponent, else the list mis-measures. (#8)
-    <Sheet visible={visible} onClose={onClose} snapPoints={["80%"]} keyboardAware scrollable>
-      <SheetFlatList
-        data={results}
-        keyExtractor={(t) => t.id}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 4, paddingBottom: 24 }}
-        stickyHeaderIndices={[0]}
-        ListHeaderComponent={
-          <View style={{ backgroundColor: "#0d1225", paddingTop: 8, paddingBottom: 8 }}>
-            <View className="flex-row items-center justify-between pb-2">
-              <Text className="text-base font-bold text-white">Link a transaction</Text>
-              <TouchableOpacity onPress={onClose} hitSlop={8}>
-                <Ionicons name="close" size={22} color="#9ca3af" />
-              </TouchableOpacity>
-            </View>
-            <TextInput
-              value={q}
-              onChangeText={setQ}
-              placeholder="Search by merchant or amount"
-              placeholderTextColor="#374151"
-              className="rounded-[12px] px-4 py-3 text-sm text-white border border-white/10"
-              style={{ backgroundColor: "rgba(255,255,255,0.06)" }}
-            />
-          </View>
-        }
-        ListEmptyComponent={
-          <Text className="text-sm text-muted text-center py-8">No transactions found.</Text>
-        }
-        renderItem={({ item }) => {
-          const sign = item.type === "Expense" ? "−" : item.type === "Income" ? "+" : "";
-          const color = item.type === "Expense" ? "#f87171" : item.type === "Income" ? "#4ade80" : "#9ca3af";
-          return (
-            <TouchableOpacity
-              onPress={() => onPick(item.id)}
-              className="flex-row items-center gap-3 py-3"
-              style={{ borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)" }}
-            >
-              <View className="flex-1">
-                <Text className="text-sm font-semibold text-white" numberOfLines={1}>
-                  {item.merchant || item.category || item.type}
-                </Text>
-                <Text className="text-xs text-dim">
-                  {new Date(item.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                  {item.bank ? ` · ${item.bank}` : ""}
-                </Text>
-              </View>
-              <Text style={{ fontSize: 14, fontWeight: "700", color }}>{sign}{fmt(item.amount)}</Text>
-            </TouchableOpacity>
-          );
-        }}
-      />
-    </Sheet>
-  );
-}

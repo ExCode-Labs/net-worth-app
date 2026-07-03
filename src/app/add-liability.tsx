@@ -202,6 +202,7 @@ export default function AddLiabilityScreen() {
                 label={isBorrow ? "Received in" : "Credited to"}
                 accountId={fromAccountId}
                 txnId={fromTxnId}
+                amount={parseFloat(balance) || 0}
                 onChange={({ accountId, txnId }) => { setFromAccountId(accountId); setFromTxnId(txnId); }}
               />
             )}
@@ -212,6 +213,7 @@ export default function AddLiabilityScreen() {
                 label="EMI paid from"
                 accountId={emiAccountId}
                 txnId={emiTxnId}
+                amount={parseFloat(emi) || 0}
                 onChange={({ accountId, txnId }) => { setEmiAccountId(accountId); setEmiTxnId(txnId); }}
               />
             )}

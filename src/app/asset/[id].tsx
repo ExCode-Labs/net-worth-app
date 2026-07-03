@@ -194,6 +194,7 @@ export default function AssetDetailScreen() {
         }
         label={isLent ? "Returned to" : "Proceeds to"}
         confirmLabel={isLent ? "Mark as Returned" : "Close asset"}
+        amount={asset.value}
         onClose={() => setSettling(false)}
         onConfirm={handleSettle}
       />
