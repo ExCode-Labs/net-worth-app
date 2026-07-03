@@ -53,17 +53,20 @@ export interface AssetDraft {
   toAccountId?: string;
   toTxnId?: string;
   startDate?: string;  // ISO; acquired / invested
-  period: string;      // months (raw input)
+  period: string;      // months (raw input) — non-deposit types only; FD/RD derive this from tenure
+  tenureUnit: "days" | "months" | "years"; // unit for `tenure` (FD/RD only); always converted to months for storage
+  maturityDate?: string; // ISO; FD/RD only — auto-filled from startDate+tenure, user-editable
 }
 
 export const EMPTY_ASSET_DRAFT: AssetDraft = {
   type: "mutual_fund", name: "", value: "", qty: "", rate: "",
   bank: "", principal: "", interest: "", tenure: "",
   policyNumber: "", premium: "", sumAssured: "", phone: "",
-  period: "",
+  period: "", tenureUnit: "months",
 };
 
 const str = (n?: number) => (n != null ? String(n) : "");
+const FAR_FUTURE = new Date(2099, 0, 1); // maturity dates are in the future, unlike "Start date"
 
 /** Rebuild an editable draft from a saved asset (inverse of buildAsset). */
 export function draftFromAsset(a: { type: string; name: string; value: number; details?: AssetDetails; startDate?: string; periodMonths?: number }): AssetDraft {
@@ -89,16 +92,39 @@ export function draftFromAsset(a: { type: string; name: string; value: number; d
     toTxnId:       d.toTxnId,
     startDate:     a.startDate,
     period:        str(a.periodMonths),
+    // The unit isn't persisted (only the month-equivalent is) — re-editing an
+    // existing deposit always shows tenure in months, regardless of how it was
+    // originally entered.
+    tenureUnit:    "months",
+    maturityDate:  d.maturityDate,
   };
 }
 
 const num = (s: string) => parseFloat(s) || 0;
 
+/** Raw `tenure` converted to months, honoring `tenureUnit` (FD/RD only). */
+export function tenureInMonths(d: AssetDraft): number {
+  const t = num(d.tenure);
+  if (d.tenureUnit === "days") return t / 30;
+  if (d.tenureUnit === "years") return t * 12;
+  return t;
+}
+
 export function maturityOf(d: AssetDraft): number {
-  const p = num(d.principal), r = num(d.interest), t = num(d.tenure);
+  const p = num(d.principal), r = num(d.interest), t = tenureInMonths(d);
   if (d.type === "fd") return fdMaturity(p, r, t);
   if (d.type === "rd") return rdMaturity(p, r, t);
   return 0;
+}
+
+/** Start date + tenure → maturity date (ISO), for FD/RD. */
+export function maturityDateOf(d: AssetDraft): string | undefined {
+  if (!d.startDate) return undefined;
+  const months = tenureInMonths(d);
+  if (months <= 0) return undefined;
+  const date = new Date(d.startDate);
+  date.setDate(date.getDate() + Math.round(months * 30)); // avoids calendar month-length drift for fractional months
+  return date.toISOString();
 }
 
 export function assetValueOf(d: AssetDraft): number {
@@ -136,8 +162,9 @@ export function buildAsset(d: AssetDraft): {
     details.bank = d.bank || undefined;
     details.principal = num(d.principal);
     details.interestRate = num(d.interest);
-    details.tenureMonths = num(d.tenure);
+    details.tenureMonths = tenureInMonths(d);
     details.maturityAmount = Math.round(maturityOf(d));
+    details.maturityDate = d.maturityDate || maturityDateOf(d);
   }
   if (d.type === "lic") {
     if (d.policyNumber.trim()) details.policyNumber = d.policyNumber.trim();
@@ -157,7 +184,7 @@ export function buildAsset(d: AssetDraft): {
     value,
     details: Object.keys(details).length ? details : undefined,
     startDate: d.startDate,
-    periodMonths: num(d.period) || undefined,
+    periodMonths: (d.type === "fd" || d.type === "rd") ? (Math.round(tenureInMonths(d)) || undefined) : (num(d.period) || undefined),
   };
 }
 
@@ -331,7 +358,29 @@ export default function AssetForm({
               </Labeled>
             </View>
           </View>
-          <Labeled label="Tenure (months)">
+          <Labeled
+            label="Tenure"
+            right={
+              <View className="flex-row gap-1.5">
+                {(["days", "months", "years"] as const).map((u) => {
+                  const active = draft.tenureUnit === u;
+                  return (
+                    <TouchableOpacity
+                      key={u}
+                      onPress={() => set({ tenureUnit: u })}
+                      className="px-2.5 py-1 rounded-full border"
+                      style={{
+                        borderColor: active ? "#a855f7" : "rgba(255,255,255,0.1)",
+                        backgroundColor: active ? "rgba(168,85,247,0.15)" : "rgba(255,255,255,0.04)",
+                      }}
+                    >
+                      <Text className="text-[10px] font-semibold capitalize" style={{ color: active ? "#c084fc" : "#9ca3af" }}>{u}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            }
+          >
             <Input value={draft.tenure} onChangeText={(v) => set({ tenure: v.replace(/[^0-9]/g, "") })} placeholder="e.g., 12" keyboardType="number-pad" />
           </Labeled>
 
@@ -341,7 +390,7 @@ export default function AssetForm({
               <Text style={{ fontSize: 24, fontWeight: "800", color: "#fff" }}>{fmt(maturity)}</Text>
               <Text className="text-[11px] text-dim mt-1">
                 Quarterly compounding · {draft.type === "rd"
-                  ? "total deposited " + fmt(num(draft.principal) * num(draft.tenure))
+                  ? "total deposited " + fmt(num(draft.principal) * tenureInMonths(draft))
                   : "principal " + fmt(num(draft.principal))}
               </Text>
             </View>
@@ -391,15 +440,30 @@ export default function AssetForm({
         />
       )}
 
-      {/* Start date + period — applies to every asset type. */}
+      {/* Start date + period — applies to every asset type; FD/RD replace the
+          generic "Period" with an editable Maturity Date instead (tenure above
+          already determines duration, so a second duration field was redundant). */}
       <View className="flex-row gap-3">
         <View className="flex-1">
-          <DateField label={draft.type === "lent" ? "Lent Date" : "Start date"} value={draft.startDate} onChange={(iso) => set({ startDate: iso })} />
+          <DateField
+            label={isDeposit ? "Deposit Date" : draft.type === "lent" ? "Lent Date" : "Start date"}
+            value={draft.startDate}
+            onChange={(iso) => set({ startDate: iso })}
+          />
         </View>
         <View className="flex-1">
-          <Labeled label="Period (months)" optional>
-            <Input value={draft.period} onChangeText={(v) => set({ period: v.replace(/[^0-9]/g, "") })} placeholder="e.g., 60" keyboardType="number-pad" />
-          </Labeled>
+          {isDeposit ? (
+            <DateField
+              label="Maturity Date"
+              value={draft.maturityDate ?? maturityDateOf(draft)}
+              maximumDate={FAR_FUTURE}
+              onChange={(iso) => set({ maturityDate: iso })}
+            />
+          ) : (
+            <Labeled label="Period (months)" optional>
+              <Input value={draft.period} onChangeText={(v) => set({ period: v.replace(/[^0-9]/g, "") })} placeholder="e.g., 60" keyboardType="number-pad" />
+            </Labeled>
+          )}
         </View>
       </View>
 

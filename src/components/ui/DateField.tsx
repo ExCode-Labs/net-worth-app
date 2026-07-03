@@ -12,10 +12,12 @@ export function DateField({
   label,
   value,
   onChange,
+  maximumDate,
 }: {
   label: string;
   value?: string;            // ISO string, or undefined/"" when unset
   onChange: (iso?: string) => void;
+  maximumDate?: Date;        // defaults to today (e.g. "Start date"); pass a future cap for dates like maturity
 }) {
   const [show, setShow] = useState(false);
   const date = value ? new Date(value) : undefined;
@@ -49,7 +51,7 @@ export function DateField({
         <DateTimePicker
           value={date ?? new Date()}
           mode="date"
-          maximumDate={new Date()}
+          maximumDate={maximumDate ?? new Date()}
           onChange={(e, selected) => {
             setShow(Platform.OS === "ios");
             if (e.type === "set" && selected) onChange(selected.toISOString());

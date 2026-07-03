@@ -41,11 +41,17 @@ export function assetSubtitle(a: Pick<Asset, "type" | "details">): string {
         ? `${d.quantity} units${d.rate ? ` · NAV ₹${d.rate}` : ""}`
         : ASSET_TYPES.mutual_fund.label;
     case "fd":
-    case "rd":
+    case "rd": {
+      const maturityDateLabel = d.maturityDate
+        ? new Date(d.maturityDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+        : "";
       return [
         d.bank ?? "",
-        d.maturityAmount ? `matures ₹${Math.round(d.maturityAmount).toLocaleString("en-IN")}` : "",
+        d.maturityAmount
+          ? `matures ${maturityDateLabel ? maturityDateLabel + " · " : ""}₹${Math.round(d.maturityAmount).toLocaleString("en-IN")}`
+          : "",
       ].filter(Boolean).join(" · ") || ASSET_TYPES[a.type].label;
+    }
     case "lent":
       return d.phone ? `Lent · ${d.phone}` : ASSET_TYPES.lent.label;
     default:

@@ -62,6 +62,7 @@ export interface AssetDetails extends LedgerRefs {
   interestRate?: number;    // annual %
   tenureMonths?: number;
   maturityAmount?: number;  // computed
+  maturityDate?: string;    // ISO — computed from startDate+tenure, editable
   startDate?: string;       // ISO
   // LIC
   policyNumber?: string;

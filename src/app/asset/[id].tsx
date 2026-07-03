@@ -33,14 +33,16 @@ function detailRows(a: Asset): { label: string; value: string }[] {
   push("Bank", d.bank);
   push("Principal", d.principal, (n) => fmt(n));
   push("Interest Rate", d.interestRate, (n) => `${n}%`);
-  push("Tenure", d.tenureMonths, (n) => `${n} months`);
+  push("Tenure", d.tenureMonths, (n) => `${Math.round(n * 10) / 10} months`);
   push("Maturity Amount", d.maturityAmount, (n) => fmt(Math.round(n)));
+  if (d.maturityDate) rows.push({ label: "Maturity Date", value: new Date(d.maturityDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) });
   push("Policy Number", d.policyNumber);
   push("Sum Assured", d.sumAssured, (n) => fmt(n));
   push("Premium", d.premium, (n) => fmt(n));
   push("Phone", d.phone);
-  if (a.startDate) rows.push({ label: a.type === "lent" ? "Lent Date" : "Start date", value: new Date(a.startDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) });
-  if (a.periodMonths) rows.push({ label: "Period", value: `${a.periodMonths} months` });
+  const isDeposit = a.type === "fd" || a.type === "rd";
+  if (a.startDate) rows.push({ label: isDeposit ? "Deposit Date" : a.type === "lent" ? "Lent Date" : "Start date", value: new Date(a.startDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) });
+  if (a.periodMonths && !isDeposit) rows.push({ label: "Period", value: `${a.periodMonths} months` });
   return rows;
 }
 
