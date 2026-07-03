@@ -3,6 +3,7 @@ import { usePrefsStore } from "@/store/prefsStore";
 import { useAccountStore } from "@/store/accountStore";
 import { convertFromINR } from "@/store/currencyStore";
 import { currencyInfo } from "@/constants/currencies";
+import { formatAmountDigits } from "./formatAmount";
 
 /**
  * Fixed-length mask shown in place of the number while "hide amounts" is on.
@@ -20,11 +21,12 @@ function toDisplay(n: number): { amount: number; symbol: string; locale: string;
   return { amount: convertFromINR(safe, info.code), symbol: info.symbol, locale: info.locale, decimals: info.decimals };
 }
 
-/** ₹1,23,456 (or the equivalent in the selected currency) */
+/** ₹1,23,456 (or the equivalent in the selected currency). Shows paise/cents
+ *  when present so ₹1.10 isn't rendered as ₹1 (see formatAmountDigits). */
 export function fmt(n: number): string {
   const { amount, symbol, locale, decimals } = toDisplay(Math.abs(n));
   if (usePrefsStore.getState().hideAmounts) return `${symbol}${MASK}`;
-  return `${symbol}${amount.toLocaleString(locale, { maximumFractionDigits: decimals })}`;
+  return `${symbol}${formatAmountDigits(amount, locale, decimals)}`;
 }
 
 /** Like fmt but keeps a leading minus for negative values — for raw aggregates
