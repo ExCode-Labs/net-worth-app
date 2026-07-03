@@ -26,6 +26,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useUserStore } from "@/store/userStore";
 import { clearAllDataStores } from "@/services/sync";
 import { requestNotificationAccess } from "@/services/notificationListener";
+import { needsOemAutostartStep, openOemAutostartSettings } from "@/services/oemAutostart";
 
 type SimpleStatus = "undetermined" | "granted" | "denied";
 
@@ -149,6 +150,8 @@ export default function PermissionsScreen() {
 
   const [batteryOpened, setBatteryOpened]   = useState(false);
   const [notifOpened, setNotifOpened]       = useState(false);
+  const [autostartOpened, setAutostartOpened] = useState(false);
+  const showAutostart = needsOemAutostartStep();
   const [contactsStatus, setContactsStatus] = useState<SimpleStatus>("undetermined");
   const [appNotifStatus, setAppNotifStatus] = useState<SimpleStatus>("undetermined");
 
@@ -198,6 +201,11 @@ export default function PermissionsScreen() {
   const handleNotifOpen = useCallback(() => {
     setNotifOpened(true);
     requestNotificationAccess();
+  }, []);
+
+  const handleAutostartOpen = useCallback(() => {
+    setAutostartOpened(true);
+    void openOemAutostartSettings();
   }, []);
 
   // Once the OS has recorded a real denial, requestPermissionsAsync() won't
@@ -279,6 +287,18 @@ export default function PermissionsScreen() {
             actionDone={notifOpened}
             onAction={handleNotifOpen}
           />
+
+          {showAutostart && (
+            <PermCard
+              icon="rocket-outline"
+              title="Autostart"
+              description="Your phone maker restricts background apps beyond Android's own battery settings. Without this, transactions can silently go uncaptured while the app is closed. Enable Autostart / background activity for NetWorth."
+              required
+              status={autostartOpened ? "done" : "pending"}
+              actionLabel="Open Autostart Settings"
+              onAction={handleAutostartOpen}
+            />
+          )}
 
           {/* Android blocks this toggle with an "App was denied access" sheet for
               apps installed outside the Play Store (sideloaded/dev builds), until
