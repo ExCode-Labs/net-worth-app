@@ -700,7 +700,7 @@ export default function VaultScreen() {
                   <SecretRow label="Card Holder" masked={vc?.cardHolder ? `${vc.cardHolder.slice(0, 1)}***` : "—"} full={vc?.cardHolder ?? ""} />
                   <View className="flex-row items-center justify-between pt-2">
                     <Text className="text-[11px] text-dim uppercase tracking-widest">Expiry</Text>
-                    <Text className="text-sm text-muted">{c.expiry || "—"}</Text>
+                    <Text className="text-sm text-muted">{vc?.expiry || "—"}</Text>
                   </View>
                   <View className="flex-row items-center justify-between pt-2">
                     <Text className="text-[11px] text-dim uppercase tracking-widest">Network · Bank</Text>

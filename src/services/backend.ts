@@ -56,7 +56,7 @@ export async function fetchBootstrap(): Promise<Bootstrap | null> {
 }
 
 export interface VaultData {
-  cards:    { id: string; number?: string | null; cardHolder?: string | null }[];
+  cards:    { id: string; number?: string | null; cardHolder?: string | null; expiry?: string | null }[];
   accounts: { id: string; accountNumber?: string | null; ifsc?: string | null; branch?: string | null }[];
 }
 

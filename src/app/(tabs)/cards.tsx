@@ -142,9 +142,9 @@ export default function CardsScreen() {
                     </Text>
                   </View>
                   <View className="items-end">
-                    <Text className="text-[11px] text-muted mb-1">Expiry</Text>
+                    <Text className="text-[11px] text-muted mb-1">Network</Text>
                     <Text className="text-[14px] font-semibold text-white">
-                      {card.expiry || "—"}
+                      {card.network || "—"}
                     </Text>
                   </View>
                 </View>

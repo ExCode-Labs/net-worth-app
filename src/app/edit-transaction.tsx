@@ -83,26 +83,65 @@ export default function EditTransactionScreen() {
 
     const finish = () => { toast.success("Transaction updated."); router.back(); };
 
-    // If the category changed and other transactions share this merchant, ask
-    // whether to retag just this one or all of them — instead of silently
-    // propagating to every match. (#21)
-    const key = categoryKey(merchantName);
-    const matches = useTransactionStore.getState().transactions
-      .filter((t) => t.id !== tx.id && categoryKey(t.merchant) === key).length;
+    // If the merchant name itself changed, ask whether to rename just this one
+    // or every other transaction still filed under the old name — same
+    // "just this one vs. all matching" choice as the category prompt below,
+    // but keyed on the OLD merchant so siblings can actually be found.
+    const oldKey = categoryKey(tx.merchant);
+    const merchantChanged = merchantName !== tx.merchant && oldKey !== "unknown";
+    const renameMatches = merchantChanged
+      ? useTransactionStore.getState().transactions
+          .filter((t) => t.id !== tx.id && categoryKey(t.merchant) === oldKey).length
+      : 0;
 
-    if (category !== tx.category && matches > 0 && key !== "unknown") {
+    const afterRename = () => {
+      // If the category changed and other transactions share this merchant, ask
+      // whether to retag just this one or all of them — instead of silently
+      // propagating to every match. (#21)
+      const key = categoryKey(merchantName);
+      const matches = useTransactionStore.getState().transactions
+        .filter((t) => t.id !== tx.id && categoryKey(t.merchant) === key).length;
+
+      if (category !== tx.category && matches > 0 && key !== "unknown") {
+        confirm({
+          title: "Apply to matching transactions?",
+          message: `${matches} other transaction${matches > 1 ? "s" : ""} from "${merchantName}" ${matches > 1 ? "share" : "shares"} this merchant. Recategorise ${matches > 1 ? "them" : "it"} to "${category}" too, or just this one?`,
+          confirmText: "All matching",
+          cancelText: "Just this one",
+          onConfirm: () => { learnCategory(merchantName, category); finish(); },
+          onCancel: finish, // this txn only — don't learn a rule or retag siblings
+        });
+      } else {
+        // No siblings to affect: safe to learn the rule for future txns.
+        learnCategory(merchantName, category);
+        finish();
+      }
+    };
+
+    // afterRename() may open a second confirm dialog (category propagation).
+    // Chaining it synchronously from inside this dialog's onConfirm/onCancel
+    // races confirmStore.accept()'s trailing set({visible:false}), which would
+    // hide the second dialog the instant it opens — defer it a tick so the two
+    // dialogs render as genuinely separate steps.
+    const afterRenameDeferred = () => setTimeout(afterRename, 0);
+
+    if (renameMatches > 0) {
       confirm({
-        title: "Apply to matching transactions?",
-        message: `${matches} other transaction${matches > 1 ? "s" : ""} from "${merchantName}" ${matches > 1 ? "share" : "shares"} this merchant. Recategorise ${matches > 1 ? "them" : "it"} to "${category}" too, or just this one?`,
+        title: "Rename matching transactions?",
+        message: `${renameMatches} other transaction${renameMatches > 1 ? "s" : ""} ${renameMatches > 1 ? "are" : "is"} also filed under "${tx.merchant}". Rename ${renameMatches > 1 ? "them" : "it"} to "${merchantName}" too, or just this one?`,
         confirmText: "All matching",
         cancelText: "Just this one",
-        onConfirm: () => { learnCategory(merchantName, category); finish(); },
-        onCancel: finish, // this txn only — don't learn a rule or retag siblings
+        onConfirm: () => {
+          const { transactions, updateTransaction } = useTransactionStore.getState();
+          transactions
+            .filter((t) => t.id !== tx.id && categoryKey(t.merchant) === oldKey)
+            .forEach((t) => updateTransaction(t.id, { merchant: merchantName }));
+          afterRenameDeferred();
+        },
+        onCancel: afterRenameDeferred, // this txn only — siblings keep the old name
       });
     } else {
-      // No siblings to affect: safe to learn the rule for future txns.
-      learnCategory(merchantName, category);
-      finish();
+      afterRename();
     }
   };
 

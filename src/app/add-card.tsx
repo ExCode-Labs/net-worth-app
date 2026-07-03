@@ -164,7 +164,7 @@ export default function AddCardScreen() {
       cardHolder: cardHolder.trim() || undefined,
       network:    network.trim() || undefined,
       last4,
-      expiry:     expiry.trim(),
+      expiry:     expiry.trim() || undefined,
       limit:      cardType === "credit" ? (parseFloat(limit) || 0) : 0,
       usage:      cardType === "credit" ? (parseFloat(usage) || 0) : 0,
       linkedAccountId: cardType === "debit" ? linkedAccountId : undefined,
@@ -337,7 +337,7 @@ export default function AddCardScreen() {
               </View>
             </View>
 
-            <LabeledInput f={{ label: "Expiry", value: expiry, set: setExpiryFmt, placeholder: "MM/YY", keyboardType: "number-pad", maxLength: 5, optional: true }} />
+            <LabeledInput f={{ label: "Expiry", value: expiry, set: setExpiryFmt, placeholder: "MM/YY", keyboardType: "number-pad", maxLength: 5, optional: true, hint: isEdit ? "Stored securely, shown only on your vault page. Leave blank to keep the current expiry." : "Stored securely, shown only on your vault page." }} />
 
             {/* Credit limit + current outstanding — credit only */}
             {cardType === "credit" && (

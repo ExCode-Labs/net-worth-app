@@ -26,7 +26,7 @@ export interface Card {
   cardHolder?:      string;   // name on card — included in bootstrap (not sensitive)
   network?:         string;   // "Visa" | "Mastercard" | "RuPay" | "Amex"
   last4:            string;   // last 4 digits of the card (always shown)
-  expiry:           string;   // MM/YY
+  expiry?:          string;   // MM/YY — stripped from bootstrap, served only via GET /vault
   limit:            number;   // total credit limit (0 for debit cards)
   usage:            number;   // current outstanding (credit) / unused (debit — not tracked)
   linkedAccountId?: string;   // Account.id — required when type = "debit"
