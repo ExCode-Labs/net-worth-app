@@ -20,13 +20,14 @@ export type TxnDirection = "debit" | "credit";
 
 export interface ParsedBankTxn {
   bank:         string;
-  accountLast4: string;
+  accountLast4: string;       // the card's last-4 when viaCard, else the account's
   amount:       number;
   direction:    TxnDirection;
   counterparty: string;
   occurredAt:   string;       // ISO string
   balance:      number | null;
   ref:          string | null; // UPI Ref / RRN / Txn ID — cross-source dedup key
+  viaCard:      boolean;      // spent via a debit card (source is the card, not an A/C)
   confidence:   "high" | "low";
   raw:          string;
 }
@@ -323,6 +324,24 @@ function isIgnorable(text: string): boolean {
   return /cashback\s+(?:request|processing)|being\s+processed|RP\s+redemption/i.test(text);
 }
 
+/**
+ * Debit-card alert? The money left via a debit card (source is the card, not an
+ * A/C) — e.g. "Withdrawn Rs.500 From HDFC Bank Card x2207 At …". Distinct from
+ * an account debit that merely *mentions* a debit card as context (SBI: "A/c
+ * 0050 debited … for your Debit Card 8030" — the real txn is on the account, so
+ * a stated account number wins). Used to route the txn to a card, not an account.
+ */
+function isDebitCardTxn(text: string): boolean {
+  if (isCreditCard(text)) return false;
+  const hasCardNumber =
+    /\bcard\b\s*(?:no\.?|ending|x)?\s*[x*]*\s*\d{3,}/i.test(text) ||
+    /\bBLOCK\s+DC\b/i.test(text);
+  if (!hasCardNumber) return false;
+  // A stated account number means the card is only context — treat as account.
+  const hasAccountNumber = /\b(?:a\/?c|account)\b[^.]{0,20}?\d{3,}/i.test(text);
+  return !hasAccountNumber;
+}
+
 /** Credit-card alert? (vs an account / debit-card one.) */
 function isCreditCard(text: string): boolean {
   return (
@@ -370,6 +389,7 @@ export function parseBankMessage(
     occurredAt: extractDate(text, receivedAtMs),
     balance:    extractBalance(text),
     ref:        extractRef(text),
+    viaCard:    isDebitCardTxn(text),
     confidence: counterparty && (accountLast4 || bank !== "Unknown") ? "high" : "low",
     raw:        text,
   };

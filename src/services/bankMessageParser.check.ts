@@ -48,6 +48,14 @@ eq(cp("Rs.90 debited A/c X1234 to someone@okaxis on 05-Jun-26"), "someone@okaxis
   eq(d?.getMonth(), 5, "occurredAt local month (Jun=5)");
 }
 
+// Debit-card routing: a withdrawal "From … Card x2207" is via the card (so the
+// number is the card's), while an A/c debit that merely mentions a debit card is
+// still an account txn.
+eq(parseBankMessage("Withdrawn Rs.500 From HDFC Bank Card x2207 At SUBRAMANYA SWAMY TEMPL On 2026-02-27:12:05:32 Bal Rs.43142 SMS BLOCK DC 2207 to 7308080808", undefined, "JK-HDFCBK-S")?.viaCard, true, "debit-card withdrawal → viaCard");
+eq(parseBankMessage("Withdrawn Rs.500 From HDFC Bank Card x2207 At SUBRAMANYA SWAMY TEMPL On 2026-02-27:12:05:32 Bal Rs.43142 SMS BLOCK DC 2207 to 7308080808", undefined, "JK-HDFCBK-S")?.accountLast4, "2207", "debit-card last4 = card number");
+eq(parseBankMessage("Dear Customer, Your A/C ending with 0050 has been debited for INR 236.0 on 20-01-26 towards annual maintenance charges for your SBI Debit Card ending with 8030.")?.viaCard, false, "A/c debit mentioning a debit card stays an account txn");
+eq(parseBankMessage("Update! INR 72,209.00 deposited in HDFC Bank A/c XX2590 on 29-MAY-26 Avl bal INR 91,951.82.")?.viaCard, false, "plain account credit is not viaCard");
+
 // Reference extraction — the cross-source dedup key. Cover the label variants
 // and the ref-less messages that must fall back to the time heuristic (null).
 eq(extractRef("Received Rs.4.12 in your Kotak Bank AC X2849 from rohit0620@upi on 03-07-26.UPI Ref:142923550637."), "142923550637", "UPI Ref: colon");

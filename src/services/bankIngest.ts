@@ -74,6 +74,32 @@ function isDuplicateOfExisting(amount: number, isCredit: boolean, ref: string | 
   return isCrossSourceDuplicate(useTransactionStore.getState().transactions, amount, isCredit, ref, nowMs);
 }
 
+/** Record a parsed txn under a matched debit card: stored as a card txn, and
+ *  (when the card has a linked account) the account's balance is updated —
+ *  the card itself carries no balance. */
+function recordUnderDebitCard(
+  parsed: ParsedBankTxn,
+  nowMs: number,
+  debitCard: Card,
+  accounts: Account[],
+): IngestOutcome {
+  const linked = debitCard.linkedAccountId
+    ? accounts.find((a) => a.id === debitCard.linkedAccountId)
+    : undefined;
+  // Stamp cardId so future replayForNewCard doesn't double-count this txn.
+  useTransactionStore.getState().addTransaction({
+    ...toTransaction(parsed, nowMs),
+    account: `Card ••${parsed.accountLast4 || debitCard.last4}`,
+    cardId: debitCard.id,
+    accountId: linked?.id, // reference-only — for sharing/display, not balance math
+  });
+  if (linked) {
+    useAccountStore.getState().updateAccount(linked.id, { balance: nextBalance(linked, parsed) });
+    return "applied";
+  }
+  return "recorded";
+}
+
 /** Ingest a single raw message. `sender` is the notification title/SMS sender,
  *  used to identify the bank. Returns what happened to it. */
 export function ingestBankMessage(raw: string, receivedAtMs?: number, sender?: string): IngestOutcome {
@@ -85,6 +111,20 @@ export function ingestBankMessage(raw: string, receivedAtMs?: number, sender?: s
   if (isDuplicateOfExisting(parsed.amount, parsed.direction === "credit", parsed.ref, nowMs)) return "duplicate";
 
   const { accounts } = useAccountStore.getState();
+  const debitCards = useCardStore.getState().cards.filter((c) => c.type === "debit");
+
+  // Debit-card alert (e.g. "Withdrawn Rs.500 From HDFC Bank Card x2207 At …"):
+  // the number is the CARD's, so route to a card — never an account. When the
+  // card isn't added yet, record as a card orphan ("add card"), not an account.
+  if (parsed.viaCard) {
+    const debitCard = findMatchingCard(debitCards, parsed.bank, parsed.accountLast4);
+    if (debitCard) return recordUnderDebitCard(parsed, nowMs, debitCard, accounts);
+    useTransactionStore.getState().addTransaction({
+      ...toTransaction(parsed, nowMs),
+      account: `Card ••${parsed.accountLast4}`,
+    });
+    return "recorded";
+  }
 
   // Primary match: bank account whose bank + last-4 match the message.
   const account = findMatchingAccount(accounts, parsed.bank, parsed.accountLast4);
@@ -96,33 +136,10 @@ export function ingestBankMessage(raw: string, receivedAtMs?: number, sender?: s
     return "applied";
   }
 
-  // Debit card match (e.g. "HDFC Bank Card x2207") — must be checked BEFORE
-  // recording the transaction so it's stored as a card txn, not a bank txn.
-  const cards = useCardStore.getState().cards;
-  const debitCard = findMatchingCard(
-    cards.filter((c) => c.type === "debit"),
-    parsed.bank,
-    parsed.accountLast4,
-  );
-  if (debitCard) {
-    // Record under the card, not the account — account field format drives the UI.
-    // Stamp cardId so future replayForNewCard doesn't double-count this txn.
-    const linked = debitCard.linkedAccountId
-      ? accounts.find((a) => a.id === debitCard.linkedAccountId)
-      : undefined;
-    const txn = {
-      ...toTransaction(parsed, nowMs),
-      account: `Card ••${parsed.accountLast4 || debitCard.last4}`,
-      cardId: debitCard.id,
-      accountId: linked?.id, // reference-only, same as above — for sharing/display
-    };
-    useTransactionStore.getState().addTransaction(txn);
-    if (linked) {
-      useAccountStore.getState().updateAccount(linked.id, { balance: nextBalance(linked, parsed) });
-      return "applied";
-    }
-    return "recorded";
-  }
+  // Safety net: number matches a debit card even though the text wasn't flagged
+  // viaCard (unusual phrasing the heuristic missed) — still record under the card.
+  const debitCard = findMatchingCard(debitCards, parsed.bank, parsed.accountLast4);
+  if (debitCard) return recordUnderDebitCard(parsed, nowMs, debitCard, accounts);
 
   // No match — log the transaction without touching any balance.
   useTransactionStore.getState().addTransaction(toTransaction(parsed, nowMs));
