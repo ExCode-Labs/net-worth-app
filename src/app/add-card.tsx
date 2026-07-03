@@ -103,6 +103,7 @@ export default function AddCardScreen() {
   const [network, setNetwork]             = useState(existing?.network ?? "");
   const [expiry, setExpiry]               = useState(existing?.expiry ?? "");
   const [limit, setLimit]                 = useState(existing ? String(existing.limit) : "");
+  const [usage, setUsage]                 = useState(existing ? String(existing.usage) : "");
   const [linkedAccountId, setLinkedAccountId] = useState(existing?.linkedAccountId ?? "");
   const [saving, setSaving]               = useState(false);
 
@@ -165,6 +166,7 @@ export default function AddCardScreen() {
       last4,
       expiry:     expiry.trim(),
       limit:      cardType === "credit" ? (parseFloat(limit) || 0) : 0,
+      usage:      cardType === "credit" ? (parseFloat(usage) || 0) : 0,
       linkedAccountId: cardType === "debit" ? linkedAccountId : undefined,
     };
 
@@ -337,9 +339,12 @@ export default function AddCardScreen() {
 
             <LabeledInput f={{ label: "Expiry", value: expiry, set: setExpiryFmt, placeholder: "MM/YY", keyboardType: "number-pad", maxLength: 5, optional: true }} />
 
-            {/* Credit limit — credit only */}
+            {/* Credit limit + current outstanding — credit only */}
             {cardType === "credit" && (
-              <LabeledInput f={{ label: "Total Limit", value: limit, set: (v) => setLimit(v.replace(/[^0-9.]/g, "")), placeholder: "0.00", keyboardType: "decimal-pad" }} />
+              <>
+                <LabeledInput f={{ label: "Total Limit", value: limit, set: (v) => setLimit(v.replace(/[^0-9.]/g, "")), placeholder: "0.00", keyboardType: "decimal-pad" }} />
+                <LabeledInput f={{ label: "Current Outstanding", value: usage, set: (v) => setUsage(v.replace(/[^0-9.]/g, "")), placeholder: "0.00", keyboardType: "decimal-pad", optional: true, hint: "Already used on this card (e.g. from your last statement). Leave blank to start at ₹0 — new transactions add to it automatically." }} />
+              </>
             )}
 
             {/* Linked account — debit only */}
