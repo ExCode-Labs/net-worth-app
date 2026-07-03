@@ -14,13 +14,16 @@ import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import { useAccountStore, selectNetWorth } from "@/store/accountStore";
 import { useCardStore, selectTotalUsage } from "@/store/cardStore";
-import { useLiabilityStore, selectTotalLiabilities } from "@/store/liabilityStore";
+import {
+  useLiabilityStore,
+  selectTotalLiabilities,
+} from "@/store/liabilityStore";
 import { tierForNetWorth } from "@/constants/networthTiers";
 import { toast } from "@/store/toastStore";
 
 export default function BadgeScreen() {
-  const accountStore   = useAccountStore();
-  const cardStore      = useCardStore();
+  const accountStore = useAccountStore();
+  const cardStore = useCardStore();
   const liabilityStore = useLiabilityStore();
 
   // Same net-worth basis as the dashboard (INR): assets − liabilities − card dues.
@@ -37,12 +40,19 @@ export default function BadgeScreen() {
   const handleShare = async () => {
     try {
       setSharing(true);
-      const uri = await captureRef(card, { format: "png", quality: 1, result: "tmpfile" });
+      const uri = await captureRef(card, {
+        format: "png",
+        quality: 1,
+        result: "tmpfile",
+      });
       if (!(await Sharing.isAvailableAsync())) {
         toast.error("Sharing isn't available on this device.");
         return;
       }
-      await Sharing.shareAsync(uri, { mimeType: "image/png", dialogTitle: "Share your NetWorth badge" });
+      await Sharing.shareAsync(uri, {
+        mimeType: "image/png",
+        dialogTitle: "Share your NetWorth badge",
+      });
     } catch {
       toast.error("Couldn't create the image. Try again.");
     } finally {
@@ -74,32 +84,89 @@ export default function BadgeScreen() {
           style={{ backgroundColor: "#080b1e", borderColor: tier.color + "55" }}
         >
           {/* Cosmic glows */}
-          <View pointerEvents="none" style={{ position: "absolute", top: -70, left: -40, width: 200, height: 200, borderRadius: 100, backgroundColor: tier.glow, opacity: 0.28 }} />
-          <View pointerEvents="none" style={{ position: "absolute", bottom: -80, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: tier.color, opacity: 0.18 }} />
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              top: -70,
+              left: -40,
+              width: 200,
+              height: 200,
+              borderRadius: 100,
+              backgroundColor: tier.glow,
+              opacity: 0.28,
+            }}
+          />
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              bottom: -80,
+              right: -50,
+              width: 220,
+              height: 220,
+              borderRadius: 110,
+              backgroundColor: tier.color,
+              opacity: 0.18,
+            }}
+          />
           {/* Star dots */}
           {STARS.map((s, i) => (
-            <View key={i} pointerEvents="none" style={{ position: "absolute", top: s.top, left: s.left, width: s.size, height: s.size, borderRadius: s.size / 2, backgroundColor: "#fff", opacity: s.opacity }} />
+            <View
+              key={i}
+              pointerEvents="none"
+              style={{
+                position: "absolute",
+                top: s.top,
+                left: s.left,
+                width: s.size,
+                height: s.size,
+                borderRadius: s.size / 2,
+                backgroundColor: "#fff",
+                opacity: s.opacity,
+              }}
+            />
           ))}
 
           <View className="items-center px-7 pt-9 pb-8">
             {/* Emblem */}
             <View
               className="w-[92px] h-[92px] rounded-full items-center justify-center mb-5 border"
-              style={{ backgroundColor: tier.color + "22", borderColor: tier.color + "77" }}
+              style={{
+                backgroundColor: tier.color + "22",
+                borderColor: tier.color + "77",
+              }}
             >
               <Ionicons name={tier.icon} size={46} color={tier.color} />
             </View>
 
-            <Text className="text-[11px] font-bold tracking-[3px] mb-1" style={{ color: tier.color }}>
+            <Text
+              className="text-[11px] font-bold tracking-[3px] mb-1"
+              style={{ color: tier.color }}
+            >
               ✦ NETWORTH CLUB ✦
             </Text>
-            <Text style={{ fontSize: 32, fontWeight: "900", color: "#fff", letterSpacing: 1, textAlign: "center" }}>
+            <Text
+              style={{
+                fontSize: 32,
+                fontWeight: "900",
+                color: "#fff",
+                letterSpacing: 1,
+                textAlign: "center",
+              }}
+            >
               {tier.name}
             </Text>
-            <Text className="text-sm font-semibold mt-1.5 mb-3" style={{ color: tier.color }}>
+            <Text
+              className="text-sm font-semibold mt-1.5 mb-3"
+              style={{ color: tier.color }}
+            >
               {tier.label}
             </Text>
-            <Text className="text-xs text-center text-secondary" style={{ lineHeight: 18, maxWidth: 260 }}>
+            <Text
+              className="text-xs text-center text-secondary"
+              style={{ lineHeight: 18, maxWidth: 260 }}
+            >
               {tier.tagline}
             </Text>
 
@@ -107,11 +174,28 @@ export default function BadgeScreen() {
             {next && (
               <View className="w-full mt-6">
                 <View className="flex-row justify-between mb-1.5">
-                  <Text className="text-[10px] text-dim font-semibold">Next: {next.name}</Text>
-                  <Text className="text-[10px] font-bold" style={{ color: next.color }}>{Math.round(progress * 100)}%</Text>
+                  <Text className="text-[10px] text-dim font-semibold">
+                    Next: {next.name}
+                  </Text>
+                  <Text
+                    className="text-[10px] font-bold"
+                    style={{ color: next.color }}
+                  >
+                    {Math.round(progress * 100)}%
+                  </Text>
                 </View>
-                <View className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.08)" }}>
-                  <View style={{ width: `${Math.max(progress * 100, 3)}%`, height: "100%", borderRadius: 999, backgroundColor: next.color }} />
+                <View
+                  className="h-1.5 rounded-full overflow-hidden"
+                  style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
+                >
+                  <View
+                    style={{
+                      width: `${Math.max(progress * 100, 3)}%`,
+                      height: "100%",
+                      borderRadius: 999,
+                      backgroundColor: next.color,
+                    }}
+                  />
                 </View>
               </View>
             )}
@@ -119,8 +203,13 @@ export default function BadgeScreen() {
             {/* Branding */}
             <View className="flex-row items-center gap-1.5 mt-7">
               <Ionicons name="planet-outline" size={13} color="#a855f7" />
-              <Text className="text-[11px] font-bold text-white">Net<Text className="text-accent-purple">Worth</Text></Text>
-              <Text className="text-[11px] text-dim"> · getworthapp.com</Text>
+              <Text className="text-[11px] font-bold text-white">
+                Net<Text className="text-accent-purple">Worth</Text>
+              </Text>
+              <Text className="text-[11px] text-dim">
+                {" "}
+                · {process.env.EXPO_PUBLIC_APP_URL}
+              </Text>
             </View>
           </View>
         </View>
@@ -138,7 +227,9 @@ export default function BadgeScreen() {
           ) : (
             <>
               <Ionicons name="share-social-outline" size={19} color="#fff" />
-              <Text className="text-base font-bold text-white">Share Badge</Text>
+              <Text className="text-base font-bold text-white">
+                Share Badge
+              </Text>
             </>
           )}
         </TouchableOpacity>
@@ -149,11 +240,11 @@ export default function BadgeScreen() {
 
 // Fixed star positions so the card looks the same every render (and capture).
 const STARS = [
-  { top: 26,  left: 34,  size: 3, opacity: 0.7 },
-  { top: 54,  left: 300, size: 2, opacity: 0.5 },
-  { top: 120, left: 20,  size: 2, opacity: 0.5 },
-  { top: 90,  left: 250, size: 3, opacity: 0.6 },
-  { top: 200, left: 60,  size: 2, opacity: 0.4 },
+  { top: 26, left: 34, size: 3, opacity: 0.7 },
+  { top: 54, left: 300, size: 2, opacity: 0.5 },
+  { top: 120, left: 20, size: 2, opacity: 0.5 },
+  { top: 90, left: 250, size: 3, opacity: 0.6 },
+  { top: 200, left: 60, size: 2, opacity: 0.4 },
   { top: 240, left: 290, size: 3, opacity: 0.6 },
   { top: 160, left: 330, size: 2, opacity: 0.45 },
 ];

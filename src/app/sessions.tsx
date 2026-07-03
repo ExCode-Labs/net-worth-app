@@ -50,6 +50,9 @@ export default function SessionsScreen() {
   const [sessions, setSessions]     = useState<DeviceSession[]>([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [revokingId, setRevokingId]     = useState<string | null>(null);
+  const [revokingOthers, setRevokingOthers] = useState(false);
+  const [signingOutCurrent, setSigningOutCurrent] = useState(false);
   const { signOut } = useAuthStore();
   const { reset: resetUser } = useUserStore();
 
@@ -70,10 +73,16 @@ export default function SessionsScreen() {
   }, [load]);
 
   const doSignOut = useCallback(async () => {
-    await logout();
-    clearAllDataStores();
-    await signOut();
-    router.replace("/(auth)/login");
+    setSigningOutCurrent(true);
+    try {
+      await logout();
+      clearAllDataStores();
+      await signOut();
+      router.replace("/(auth)/login");
+    } catch (e) {
+      toast.error(apiError(e, "Couldn't sign out. Try again."));
+      setSigningOutCurrent(false);
+    }
   }, [signOut]);
 
   // Sign out one specific other-device session.
@@ -86,12 +95,15 @@ export default function SessionsScreen() {
       destructive: true,
       onConfirm: () => {
         void (async () => {
+          setRevokingId(s.id);
           try {
             await revokeSession(s.id);
             setSessions((prev) => prev.filter((x) => x.id !== s.id));
             toast.success("Device signed out.");
           } catch (e) {
             toast.error(apiError(e, "Couldn't sign out that device."));
+          } finally {
+            setRevokingId(null);
           }
         })();
       },
@@ -120,6 +132,7 @@ export default function SessionsScreen() {
       destructive: true,
       onConfirm: () => {
         void (async () => {
+          setRevokingOthers(true);
           try {
             await Promise.all(others.map((s) => revokeSession(s.id)));
             setSessions((prev) => prev.filter((s) => s.current));
@@ -127,6 +140,8 @@ export default function SessionsScreen() {
           } catch (e) {
             toast.error(apiError(e, "Couldn't sign out the other devices."));
             void load();
+          } finally {
+            setRevokingOthers(false);
           }
         })();
       },
@@ -227,11 +242,14 @@ export default function SessionsScreen() {
                   {!s.current && (
                     <TouchableOpacity
                       onPress={() => onRevoke(s)}
-                      className="px-3 py-2 rounded-full border border-accent-red/35"
-                      style={{ backgroundColor: "rgba(248,113,113,0.12)" }}
+                      disabled={revokingId === s.id}
+                      className="px-3 py-2 rounded-full border border-accent-red/35 items-center justify-center"
+                      style={{ backgroundColor: "rgba(248,113,113,0.12)", minWidth: 74 }}
                       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                     >
-                      <Text className="text-[12px] font-semibold text-accent-red">Sign out</Text>
+                      {revokingId === s.id
+                        ? <ActivityIndicator size="small" color="#f87171" />
+                        : <Text className="text-[12px] font-semibold text-accent-red">Sign out</Text>}
                     </TouchableOpacity>
                   )}
                 </View>
@@ -240,13 +258,20 @@ export default function SessionsScreen() {
                 {s.current && (
                   <TouchableOpacity
                     onPress={onRevokeCurrent}
+                    disabled={signingOutCurrent}
                     className="flex-row items-center justify-center gap-1.5 py-2.5 border-t border-white/[0.06]"
                     style={{ backgroundColor: "rgba(248,113,113,0.06)" }}
                   >
-                    <Ionicons name="log-out-outline" size={14} color="#f87171" />
-                    <Text className="text-[12px] font-semibold text-accent-red">
-                      Sign out this device
-                    </Text>
+                    {signingOutCurrent ? (
+                      <ActivityIndicator size="small" color="#f87171" />
+                    ) : (
+                      <>
+                        <Ionicons name="log-out-outline" size={14} color="#f87171" />
+                        <Text className="text-[12px] font-semibold text-accent-red">
+                          Sign out this device
+                        </Text>
+                      </>
+                    )}
                   </TouchableOpacity>
                 )}
               </View>
@@ -257,14 +282,21 @@ export default function SessionsScreen() {
           {others.length > 0 && (
             <TouchableOpacity
               onPress={onRevokeOthers}
+              disabled={revokingOthers}
               className="flex-row items-center justify-center gap-2 rounded-[14px] py-4 mt-5 border border-accent-red/20"
-              style={{ backgroundColor: "rgba(248,113,113,0.08)" }}
+              style={{ backgroundColor: "rgba(248,113,113,0.08)", opacity: revokingOthers ? 0.6 : 1 }}
               activeOpacity={0.8}
             >
-              <Ionicons name="log-out-outline" size={17} color="#f87171" />
-              <Text style={{ fontSize: 14, fontWeight: "700", color: "#f87171" }}>
-                Sign out all other devices
-              </Text>
+              {revokingOthers ? (
+                <ActivityIndicator size="small" color="#f87171" />
+              ) : (
+                <>
+                  <Ionicons name="log-out-outline" size={17} color="#f87171" />
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#f87171" }}>
+                    Sign out all other devices
+                  </Text>
+                </>
+              )}
             </TouchableOpacity>
           )}
         </ScrollView>

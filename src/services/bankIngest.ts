@@ -39,7 +39,10 @@ export interface IngestSummary {
 /** Build a store Transaction (sans id) from a parsed bank txn. */
 function toTransaction(p: ParsedBankTxn): Omit<Transaction, "id"> {
   const merchant = resolvePayee(p.counterparty) || "Unknown";
-  const fallback = p.direction === "credit" ? "Income" : "Others";
+  // "Others" is the shared catch-all in both the Expense and Income category
+  // lists — a made-up name here (e.g. "Income") wouldn't match any entry in
+  // CATEGORIES, leaving the txn without an icon and unselectable in the picker.
+  const fallback = "Others";
   return {
     type:       p.direction === "credit" ? "Income" : "Expense",
     amount:     p.amount,
@@ -75,7 +78,9 @@ export function ingestBankMessage(raw: string, receivedAtMs?: number, sender?: s
   // Primary match: bank account whose bank + last-4 match the message.
   const account = findMatchingAccount(accounts, parsed.bank, parsed.accountLast4);
   if (account) {
-    useTransactionStore.getState().addTransaction(toTransaction(parsed));
+    // accountId is reference-only here (drives sharing/display) — it never
+    // feeds back into balance math, since applyTxBalance bails on non-manual txns.
+    useTransactionStore.getState().addTransaction({ ...toTransaction(parsed), accountId: account.id });
     useAccountStore.getState().updateAccount(account.id, { balance: nextBalance(account, parsed) });
     return "applied";
   }
@@ -91,18 +96,19 @@ export function ingestBankMessage(raw: string, receivedAtMs?: number, sender?: s
   if (debitCard) {
     // Record under the card, not the account — account field format drives the UI.
     // Stamp cardId so future replayForNewCard doesn't double-count this txn.
+    const linked = debitCard.linkedAccountId
+      ? accounts.find((a) => a.id === debitCard.linkedAccountId)
+      : undefined;
     const txn = {
       ...toTransaction(parsed),
       account: `Card ••${parsed.accountLast4 || debitCard.last4}`,
       cardId: debitCard.id,
+      accountId: linked?.id, // reference-only, same as above — for sharing/display
     };
     useTransactionStore.getState().addTransaction(txn);
-    if (debitCard.linkedAccountId) {
-      const linked = accounts.find((a) => a.id === debitCard.linkedAccountId);
-      if (linked) {
-        useAccountStore.getState().updateAccount(linked.id, { balance: nextBalance(linked, parsed) });
-        return "applied";
-      }
+    if (linked) {
+      useAccountStore.getState().updateAccount(linked.id, { balance: nextBalance(linked, parsed) });
+      return "applied";
     }
     return "recorded";
   }
@@ -115,7 +121,9 @@ export function ingestBankMessage(raw: string, receivedAtMs?: number, sender?: s
 /** Build a store Transaction (sans id) from a parsed card txn. */
 function cardToTransaction(p: ParsedCardTxn): Omit<Transaction, "id"> {
   const merchant = resolvePayee(p.merchant) || "Unknown";
-  const fallback = p.direction === "payment" ? "Card Payment" : "Card Spend";
+  // Same reasoning as toTransaction() above — "Card Payment"/"Card Spend" aren't
+  // real categories, so they'd show no icon and couldn't be picked in the editor.
+  const fallback = "Others";
   return {
     type:       p.direction === "payment" ? "Income" : "Expense",
     amount:     p.amount,
@@ -184,6 +192,10 @@ export function replayForNewAccount(account: Account): void {
   useAccountStore.getState().updateAccount(account.id, {
     balance: account.balance + net,
   });
+  // Stamp accountId now they're linked (reference-only — same non-manual guard
+  // in applyTxBalance means this still never re-drives a balance update).
+  const { updateTransaction } = useTransactionStore.getState();
+  matched.forEach((t) => updateTransaction(t.id, { accountId: account.id }));
 }
 
 /**

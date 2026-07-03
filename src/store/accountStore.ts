@@ -17,7 +17,8 @@ export interface Account {
   nickname: string;         // e.g. "HDFC - 1234"
   balance: number;
   accountName?: string;     // optional holder/label, e.g. "Salary Account"
-  accountNumber?: string;   // last 4 digits in bootstrap; full number only from GET /vault
+  accountNumber?: string;   // full number — set locally or from GET /vault; NEVER a truncated stub
+  accountNumberLast4?: string | null; // display-only preview from bootstrap when the full number isn't known locally
   ifsc?: string;            // vault-only
   branch?: string;          // vault-only
 }
@@ -78,6 +79,7 @@ export interface Asset {
   details?: AssetDetails;
   closed?: boolean;   // archived (e.g. sold / matured / repaid) — kept as history,
                       // excluded from net-worth totals and the active list
+  closedDate?: string;    // ISO date it was closed / returned
   startDate?: string;     // ISO date acquired / invested
   periodMonths?: number;  // holding period / lock-in / tenure, in months
 }
@@ -174,7 +176,8 @@ export const useAccountStore = create<AccountStore>()(
 // ── Account matching helpers ───────────────────────────────────────────────────
 /** Last 4 digits of an account's number, or "" if none on file. */
 export function accountLast4(a: Account): string {
-  return (a.accountNumber ?? "").replace(/\D/g, "").slice(-4);
+  if (a.accountNumber) return a.accountNumber.replace(/\D/g, "").slice(-4);
+  return a.accountNumberLast4 ?? "";
 }
 
 /** "•••• 1234" — masks all but the last 4. For use outside the vault page. */

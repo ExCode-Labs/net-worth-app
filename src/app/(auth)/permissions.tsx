@@ -19,6 +19,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { router } from "expo-router";
 import * as IntentLauncher from "expo-intent-launcher";
+import * as Linking from "expo-linking";
 import * as Contacts from "expo-contacts";
 import * as Notifications from "expo-notifications";
 import { useAuthStore } from "@/store/authStore";
@@ -108,7 +109,6 @@ function PermCard({ icon, title, description, required, status, actionLabel, act
         <View className="mt-3 items-start">
           <TouchableOpacity
             onPress={onAction}
-            disabled={denied}
             className="px-4 py-2 rounded-full border"
             style={{
               backgroundColor: denied
@@ -127,7 +127,7 @@ function PermCard({ icon, title, description, required, status, actionLabel, act
               className="text-xs font-semibold"
               style={{ color: denied ? "#f87171" : actionDone ? "#22c55e" : "#c084fc" }}
             >
-              {denied ? "Permission denied" : actionLabel}
+              {actionLabel}
             </Text>
           </TouchableOpacity>
         </View>
@@ -165,12 +165,20 @@ export default function PermissionsScreen() {
     }
   }, [refreshNotifAccess]);
 
-  // Refresh notification access whenever the user returns from system settings.
+  // Refresh all permission statuses whenever the user returns from system settings.
   useEffect(() => {
     const sub = AppState.addEventListener("change", (state) => {
       if (state === "active") {
         setNotifOpened(false);
         refreshNotifAccess();
+        if (Platform.OS !== "web") {
+          Contacts.getPermissionsAsync()
+            .then((r) => setContactsStatus(r.status as SimpleStatus))
+            .catch(() => {});
+          Notifications.getPermissionsAsync()
+            .then((r) => setAppNotifStatus(r.status as SimpleStatus))
+            .catch(() => {});
+        }
       }
     });
     return () => sub.remove();
@@ -192,15 +200,26 @@ export default function PermissionsScreen() {
     requestNotificationAccess();
   }, []);
 
+  // Once the OS has recorded a real denial, requestPermissionsAsync() won't
+  // re-show the prompt — it just silently returns "denied" again. Only the
+  // Settings app can flip it back, so route there instead.
   const handleContacts = useCallback(async () => {
+    if (contactsStatus === "denied") {
+      Linking.openSettings();
+      return;
+    }
     const { status } = await Contacts.requestPermissionsAsync();
     setContactsStatus(status as SimpleStatus);
-  }, []);
+  }, [contactsStatus]);
 
   const handleAppNotif = useCallback(async () => {
+    if (appNotifStatus === "denied") {
+      Linking.openSettings();
+      return;
+    }
     const { status } = await Notifications.requestPermissionsAsync();
     setAppNotifStatus(status as SimpleStatus);
-  }, []);
+  }, [appNotifStatus]);
 
   const handleSignOut = useCallback(async () => {
     clearAllDataStores();
@@ -260,6 +279,28 @@ export default function PermissionsScreen() {
             actionDone={notifOpened}
             onAction={handleNotifOpen}
           />
+
+          {/* Android blocks this toggle with an "App was denied access" sheet for
+              apps installed outside the Play Store (sideloaded/dev builds), until
+              the user explicitly allows restricted settings for this app. */}
+          {notifAccess === "denied" && (
+            <View
+              className="rounded-2xl border p-4"
+              style={{ backgroundColor: "rgba(248,113,113,0.07)", borderColor: "rgba(248,113,113,0.2)" }}
+            >
+              <Text className="text-sm font-semibold text-white mb-2">
+                Seeing &quot;App was denied access&quot;?
+              </Text>
+              <Text className="text-xs text-dim" style={{ lineHeight: 18 }}>
+                Android blocks this toggle for apps installed outside the Play Store. To unblock it:
+                {"\n"}1. Long-press the NetWorth icon → <Text className="font-semibold text-secondary">App info</Text>
+                {"\n"}2. Tap the <Text className="font-semibold text-secondary">⋮</Text> menu (top-right)
+                {"\n"}3. Tap <Text className="font-semibold text-secondary">Allow restricted settings</Text>
+                {"\n"}4. Confirm with your PIN / fingerprint
+                {"\n"}5. Come back here and tap &quot;Open Notification Settings&quot; again
+              </Text>
+            </View>
+          )}
         </Animated.View>
 
         {/* Optional */}
@@ -277,7 +318,7 @@ export default function PermissionsScreen() {
               : contactsStatus === "denied" ? "denied"
               : "pending"
             }
-            actionLabel="Allow Access"
+            actionLabel={contactsStatus === "denied" ? "Open Settings" : "Allow Access"}
             onAction={handleContacts}
           />
 
@@ -290,7 +331,7 @@ export default function PermissionsScreen() {
               : appNotifStatus === "denied" ? "denied"
               : "pending"
             }
-            actionLabel="Allow Access"
+            actionLabel={appNotifStatus === "denied" ? "Open Settings" : "Allow Access"}
             onAction={handleAppNotif}
           />
         </Animated.View>

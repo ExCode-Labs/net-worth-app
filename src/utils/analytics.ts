@@ -84,6 +84,38 @@ export function topMerchants(txns: Transaction[], sinceMs = 0, limit = 5): Slice
     .slice(0, limit);
 }
 
+export interface CardMonthPoint {
+  key: string;
+  label: string;
+  card: number;   // expense paid via a tracked card (cardId set)
+  other: number;  // expense via account/cash
+}
+
+/** Monthly card-spend vs other-spend split, last `count` months — surfaces
+ *  card usage trend (e.g. "card spend up 3 months running"). */
+export function cardSpendSeries(txns: Transaction[], count = 6, now: Date = new Date()): CardMonthPoint[] {
+  const months: CardMonthPoint[] = [];
+  for (let i = count - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({
+      key: `${d.getFullYear()}-${d.getMonth()}`,
+      label: d.toLocaleDateString("en-IN", { month: "short" }),
+      card: 0,
+      other: 0,
+    });
+  }
+  const idx = new Map(months.map((m, i) => [m.key, i]));
+  for (const t of txns) {
+    if (t.type !== "Expense") continue;
+    const d = new Date(t.date);
+    const i = idx.get(`${d.getFullYear()}-${d.getMonth()}`);
+    if (i === undefined) continue;
+    if (t.cardId) months[i].card += t.amount;
+    else months[i].other += t.amount;
+  }
+  return months;
+}
+
 export interface Summary {
   income: number;
   expense: number;

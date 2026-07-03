@@ -26,6 +26,7 @@ export default function SharedDataScreen() {
   const [data, setData] = useState<SharedData | null>(null);
   const [loading, setLoad] = useState(true);
   const [error, setError] = useState(false);
+  const [optingOut, setOptingOut] = useState(false);
 
   const load = useCallback(async () => {
     if (!ownerId) return;
@@ -56,6 +57,7 @@ export default function SharedDataScreen() {
       cancelText: "Cancel",
       destructive: true,
       onConfirm: async () => {
+        setOptingOut(true);
         try {
           await optOutIncoming(ownerId);
           resetShareCache(); // force the sharing list to refetch without this owner
@@ -63,6 +65,7 @@ export default function SharedDataScreen() {
           router.back();
         } catch (e) {
           toast.error(apiError(e, "Couldn't opt out."));
+          setOptingOut(false);
         }
       },
     });
@@ -85,11 +88,14 @@ export default function SharedDataScreen() {
         {data && (
           <TouchableOpacity
             onPress={handleOptOut}
+            disabled={optingOut}
             className="w-[38px] h-[38px] rounded-[11px] border border-accent-red/35 items-center justify-center"
             style={{ backgroundColor: "rgba(248,113,113,0.12)" }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons name="eye-off-outline" size={18} color="#f87171" />
+            {optingOut
+              ? <ActivityIndicator size="small" color="#f87171" />
+              : <Ionicons name="eye-off-outline" size={18} color="#f87171" />}
           </TouchableOpacity>
         )}
       </View>
@@ -128,6 +134,23 @@ export default function SharedDataScreen() {
                       <Row key={i} left={a.name} sub={a.bank} right={fmt(a.balance)} />
                     ))}
                   </View>
+                )}
+              </Card>
+            )}
+
+            {data.transactions && (
+              <Card title="Transactions" icon="swap-horizontal-outline" accent="#3b82f6">
+                {data.transactions.items.length === 0 ? (
+                  <Empty />
+                ) : (
+                  data.transactions.items.map((t, i) => (
+                    <Row
+                      key={i}
+                      left={t.merchant || t.category || t.type}
+                      sub={new Date(t.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                      right={`${t.type === "Expense" ? "−" : t.type === "Income" ? "+" : ""}${fmt(t.amount)}`}
+                    />
+                  ))
                 )}
               </Card>
             )}

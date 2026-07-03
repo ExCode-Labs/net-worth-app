@@ -12,7 +12,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useLiabilityStore } from "@/store/liabilityStore";
 import { useAccountStore } from "@/store/accountStore";
 import { useTransactionStore } from "@/store/transactionStore";
-import { SettleSheet, accountRefLabel, txnRefLabel } from "@/components/ui/LedgerLink";
+import { SettleSheet, accountRefLabel, txnRefLabel, txnDateLabel } from "@/components/ui/LedgerLink";
 import { fmt } from "@/utils/formatters";
 import { toast } from "@/store/toastStore";
 import { confirm } from "@/store/confirmStore";
@@ -49,16 +49,35 @@ export default function LiabilityDetailScreen() {
   ];
   if (liability.lender) rows.push({ label: isBorrow ? "Lender" : "Lender / Financier", value: liability.lender });
   if (liability.emi > 0) rows.push({ label: "Monthly EMI", value: fmt(liability.emi) });
-  if (liability.startDate) rows.push({ label: "Start date", value: new Date(liability.startDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) });
+  if (liability.startDate) rows.push({ label: isBorrow ? "Borrow Date" : "Start date", value: new Date(liability.startDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) });
   if (liability.periodMonths) rows.push({ label: "Period", value: `${liability.periodMonths} months` });
   // Money-movement legs: where it landed, which account pays the EMI, and the
   // repayment account once closed.
   if (d.fromAccountId) rows.push({ label: isBorrow ? "Received in" : "Credited to", value: accountRefLabel(accounts, d.fromAccountId) });
-  if (d.fromTxnId) rows.push({ label: isBorrow ? "Received txn" : "Credit txn", value: txnRefLabel(transactions.find((t) => t.id === d.fromTxnId)) });
+  if (d.fromTxnId) {
+    const tx = transactions.find((t) => t.id === d.fromTxnId);
+    rows.push({ label: isBorrow ? "Received txn" : "Credit txn", value: txnRefLabel(tx) });
+    const when = txnDateLabel(tx);
+    if (when) rows.push({ label: isBorrow ? "Received on" : "Credited on", value: when });
+  }
   if (d.emiAccountId) rows.push({ label: "EMI paid from", value: accountRefLabel(accounts, d.emiAccountId) });
-  if (d.emiTxnId) rows.push({ label: "EMI txn", value: txnRefLabel(transactions.find((t) => t.id === d.emiTxnId)) });
+  if (d.emiTxnId) {
+    const tx = transactions.find((t) => t.id === d.emiTxnId);
+    rows.push({ label: "EMI txn", value: txnRefLabel(tx) });
+    const when = txnDateLabel(tx);
+    if (when) rows.push({ label: "EMI on", value: when });
+  }
   if (liability.closed && d.toAccountId) rows.push({ label: "Repaid from", value: accountRefLabel(accounts, d.toAccountId) });
-  if (liability.closed && d.toTxnId) rows.push({ label: "Repaid txn", value: txnRefLabel(transactions.find((t) => t.id === d.toTxnId)) });
+  if (liability.closed && d.toTxnId) {
+    const tx = transactions.find((t) => t.id === d.toTxnId);
+    rows.push({ label: "Repaid txn", value: txnRefLabel(tx) });
+  }
+  if (liability.closed && liability.closedDate) {
+    rows.push({
+      label: "Repaid on",
+      value: new Date(liability.closedDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+    });
+  }
 
   const handleDelete = () => {
     confirm({
@@ -72,7 +91,7 @@ export default function LiabilityDetailScreen() {
 
   const handleClose = () => {
     if (liability.closed) {
-      updateLiability(liability.id, { closed: false, details: { ...d, toAccountId: undefined, toTxnId: undefined } });
+      updateLiability(liability.id, { closed: false, closedDate: undefined, details: { ...d, toAccountId: undefined, toTxnId: undefined } });
       toast.success("Liability reopened.");
       return;
     }
@@ -80,8 +99,8 @@ export default function LiabilityDetailScreen() {
     setSettling(true);
   };
 
-  const handleSettle = (refs: { accountId?: string; txnId?: string }) => {
-    updateLiability(liability.id, { closed: true, details: { ...d, toAccountId: refs.accountId, toTxnId: refs.txnId } });
+  const handleSettle = (refs: { accountId?: string; txnId?: string; date?: string }) => {
+    updateLiability(liability.id, { closed: true, closedDate: refs.date, details: { ...d, toAccountId: refs.accountId, toTxnId: refs.txnId } });
     setSettling(false);
     toast.success("Marked repaid.");
   };

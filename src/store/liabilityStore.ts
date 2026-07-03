@@ -20,6 +20,7 @@ export interface Liability {
   details?: LedgerRefs; // borrow: which account received/repaid + linked txns
   closed?: boolean;  // repaid/settled — kept as history, excluded from totals
                      // and the active list
+  closedDate?: string;    // ISO date it was repaid
   startDate?: string;     // ISO date the loan/EMI/borrow started
   periodMonths?: number;  // tenure in months
 }

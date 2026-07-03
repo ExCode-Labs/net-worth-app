@@ -1,6 +1,6 @@
 /** Self-check for analytics helpers. Run: npx tsx src/utils/analytics.check.ts */
 import type { Transaction } from "../store/transactionStore";
-import { monthlySeries, categoryTotals, topMerchants, periodSummary, periodStart } from "./analytics";
+import { monthlySeries, categoryTotals, topMerchants, periodSummary, periodStart, cardSpendSeries } from "./analytics";
 
 let failures = 0;
 const eq = (a: unknown, b: unknown, label: string) => {
@@ -56,6 +56,17 @@ eq(s.count, 6, "summary count excludes transfer");
 eq(periodStart("ALL", now), 0, "ALL = 0");
 eq(periodStart("1M", now) < now.getTime(), true, "1M in past");
 eq(periodStart("6M", now) < periodStart("1M", now), true, "6M older than 1M");
+
+// cardSpendSeries: card-tagged expense vs. other expense, Jun = card 120, other 200.
+const cardTxns: Transaction[] = [
+  tx({ amount: 100, cardId: "c1" }),
+  tx({ amount: 20,  cardId: "c1" }),
+  tx({ amount: 200 }), // no cardId
+  tx({ type: "Income", amount: 5000, cardId: "c1" }), // income ignored regardless of cardId
+];
+const cs = cardSpendSeries(cardTxns, 6, now);
+eq(cs[5].card, 120, "Jun card spend");
+eq(cs[5].other, 200, "Jun other spend");
 
 if (failures) throw new Error(`${failures} analytics check(s) failed`);
 console.log("analytics: all checks passed");

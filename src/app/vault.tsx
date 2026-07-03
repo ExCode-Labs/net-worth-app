@@ -38,8 +38,18 @@ import { fetchVaultData, type VaultData } from "@/services/backend";
 import { apiError } from "@/utils/apiError";
 import { usePreventScreenCapture } from "@/utils/screenCapture";
 import PinPad from "@/components/security/PinPad";
+import { Button } from "@/components/ui/Button";
 
 const PIN_LEN = 6;
+
+/** Obscures a short text value — keeps 2 chars each end, fixed-width bullets
+ *  in between (not length-revealing). Used for IFSC/branch, which have no
+ *  dedicated mask helper the way account/card numbers do. */
+function maskText(s: string): string {
+  if (!s) return "—";
+  if (s.length <= 4) return "••••";
+  return `${s.slice(0, 2)}••••••${s.slice(-2)}`;
+}
 
 // ── A single revealable secret row ──────────────────────────────────────────
 function SecretRow({ label, masked, full }: { label: string; masked: string; full: string }) {
@@ -120,6 +130,7 @@ export default function VaultScreen() {
   const [error, setError]   = useState<string | null>(null);
   const [vaultData, setVaultData] = useState<VaultData | null>(null);
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
   // Reset flow
   const [otp, setOtp]         = useState("");
@@ -150,6 +161,7 @@ export default function VaultScreen() {
       setFirst("");
       return;
     }
+    setVerifying(true);
     try {
       await setupVaultPin(entered);
       useUserStore.setState({ hasVaultPin: true });
@@ -159,11 +171,14 @@ export default function VaultScreen() {
       toast.error(apiError(e, "Failed to save PIN. Try again."));
       clearPin();
       setVaultState("setup-enter");
+    } finally {
+      setVerifying(false);
     }
   }, [vaultState, firstPin, openVault]);
 
   // ── Unlock: verify PIN ──────────────────────────────────────────────────────
   const onUnlockComplete = useCallback(async (entered: string) => {
+    setVerifying(true);
     try {
       const result = await verifyVaultPin(entered);
       if (result.ok) {
@@ -182,11 +197,14 @@ export default function VaultScreen() {
     } catch (e) {
       setError(apiError(e, "Could not verify PIN. Check your connection."));
       setPin("");
+    } finally {
+      setVerifying(false);
     }
   }, [openVault]);
 
   // ── Change PIN flow ─────────────────────────────────────────────────────────
   const onChangeVerify = useCallback(async (entered: string) => {
+    setVerifying(true);
     try {
       const result = await verifyVaultPin(entered);
       if (result.ok) {
@@ -206,6 +224,8 @@ export default function VaultScreen() {
     } catch (e) {
       setError(apiError(e, "Could not verify. Check your connection."));
       setPin("");
+    } finally {
+      setVerifying(false);
     }
   }, []);
 
@@ -223,6 +243,7 @@ export default function VaultScreen() {
       setFirst("");
       return;
     }
+    setVerifying(true);
     try {
       await setupVaultPin(entered);
       toast.success("Vault PIN changed.");
@@ -233,17 +254,22 @@ export default function VaultScreen() {
       toast.error(apiError(e, "Failed to save new PIN."));
       clearPin();
       setVaultState("change-new");
+    } finally {
+      setVerifying(false);
     }
   }, [firstPin]);
 
   // ── Reset flow ──────────────────────────────────────────────────────────────
   const handleSendOtp = async () => {
+    setVerifying(true);
     try {
       await requestVaultPinReset();
       toast.success("OTP sent to your email.");
       setVaultState("reset-verify");
     } catch (e) {
       toast.error(apiError(e, "Failed to send OTP. Try again."));
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -251,6 +277,7 @@ export default function VaultScreen() {
     if (newPin.length < PIN_LEN) { toast.error(`PIN must be ${PIN_LEN} digits.`); return; }
     if (newPin !== newPinC)       { toast.error("PINs don't match."); return; }
     if (otp.length !== 6)         { toast.error("OTP must be 6 digits."); return; }
+    setVerifying(true);
     try {
       await resetVaultPin(otp, newPin);
       useUserStore.setState({ hasVaultPin: true });
@@ -258,6 +285,8 @@ export default function VaultScreen() {
       openVault();
     } catch (e) {
       toast.error(apiError(e, "Invalid OTP or PIN. Try again."));
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -292,6 +321,7 @@ export default function VaultScreen() {
             }
             error={error}
             onComplete={onSetupComplete}
+            loading={verifying}
           />
         </View>
       </SafeAreaView>
@@ -364,6 +394,7 @@ export default function VaultScreen() {
             subtitle="Unlock to access your full card and account details"
             error={error}
             onComplete={onUnlockComplete}
+            loading={verifying}
           />
         </View>
       </SafeAreaView>
@@ -410,6 +441,7 @@ export default function VaultScreen() {
             subtitle={subtitles[vaultState]}
             error={error}
             onComplete={completeFns[vaultState]}
+            loading={verifying}
           />
         </View>
       </SafeAreaView>
@@ -439,14 +471,7 @@ export default function VaultScreen() {
               We&apos;ll send a 6-digit code to your email{email ? ` (${email})` : ""} to verify it&apos;s you.
             </Text>
           </View>
-          <TouchableOpacity
-            onPress={handleSendOtp}
-            className="rounded-2xl py-4 items-center"
-            style={{ backgroundColor: "rgba(168,85,247,0.9)" }}
-            activeOpacity={0.8}
-          >
-            <Text className="text-base font-bold text-white">Send OTP</Text>
-          </TouchableOpacity>
+          <Button label="Send OTP" onPress={handleSendOtp} isLoading={verifying} />
         </View>
       </SafeAreaView>
     );
@@ -508,14 +533,7 @@ export default function VaultScreen() {
             style={{ backgroundColor: "rgba(255,255,255,0.05)" }}
           />
 
-          <TouchableOpacity
-            onPress={handleResetVerify}
-            className="rounded-2xl py-4 items-center"
-            style={{ backgroundColor: "rgba(168,85,247,0.9)" }}
-            activeOpacity={0.8}
-          >
-            <Text className="text-base font-bold text-white">Set New PIN</Text>
-          </TouchableOpacity>
+          <Button label="Set New PIN" onPress={handleResetVerify} isLoading={verifying} />
         </ScrollView>
       </SafeAreaView>
     );
@@ -630,8 +648,8 @@ export default function VaultScreen() {
                     masked={maskAccountNumber({ ...a, accountNumber: va?.accountNumber ?? undefined }) || "—"}
                     full={va?.accountNumber ?? ""}
                   />
-                  <SecretRow label="IFSC" masked={va?.ifsc ?? "—"} full={va?.ifsc ?? ""} />
-                  <SecretRow label="Branch" masked={va?.branch ?? "—"} full={va?.branch ?? ""} />
+                  <SecretRow label="IFSC" masked={maskText(va?.ifsc ?? "")} full={va?.ifsc ?? ""} />
+                  <SecretRow label="Branch" masked={maskText(va?.branch ?? "")} full={va?.branch ?? ""} />
                   <View className="flex-row items-center justify-between pt-2">
                     <Text className="text-[11px] text-dim uppercase tracking-widest">Bank</Text>
                     <Text className="text-sm text-muted">

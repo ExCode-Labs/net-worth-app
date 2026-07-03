@@ -12,10 +12,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Chip } from "@/components/ui/Chip";
 import { Sheet } from "@/components/ui/Sheet";
-import { useAccountStore, accountLabel, CASH_ACCOUNT, type Account } from "@/store/accountStore";
+import { DateField } from "@/components/ui/DateField";
+import { useAccountStore, accountLabel, findMatchingAccount, CASH_ACCOUNT, type Account } from "@/store/accountStore";
 import { useTransactionStore, type Transaction } from "@/store/transactionStore";
 import { usePickTxnStore } from "@/store/pickTxnStore";
-import { fmt } from "@/utils/formatters";
+import { fmt, fmtDate } from "@/utils/formatters";
 import { useAmountVisibilitySync } from "@/store/prefsStore";
 
 /** Human label for a stored account ref ("cash" / account id / unset). */
@@ -33,6 +34,15 @@ export function txnRefLabel(tx?: Transaction): string {
   return `${sign}${fmt(tx.amount)} · ${tx.merchant || tx.category || tx.type}`;
 }
 
+/** Date + time of a linked transaction, for its own row (kept separate from the
+ * amount/merchant line so the card doesn't cram two facts into one row). */
+export function txnDateLabel(tx?: Transaction): string | undefined {
+  if (!tx) return undefined;
+  const when = new Date(tx.date);
+  const time = when.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+  return `${fmtDate(when)}, ${time}`;
+}
+
 export function LedgerLink({
   label,
   accountId,
@@ -45,18 +55,34 @@ export function LedgerLink({
   txnId?: string;
   /** Amount the linked txn should match — drives the picker's mismatch prompt. */
   amount?: number;
-  onChange: (next: { accountId?: string; txnId?: string }) => void;
+  /** `txn` is passed only when a transaction was just picked, so callers can
+   * auto-fill fields (amount, date) from it without re-deriving the lookup. */
+  onChange: (next: { accountId?: string; txnId?: string; txn?: Transaction }) => void;
 }) {
   useAmountVisibilitySync();
   const accounts = useAccountStore((s) => s.accounts);
-  const linkedTx = useTransactionStore((s) => s.transactions.find((t) => t.id === txnId));
+  const transactions = useTransactionStore((s) => s.transactions);
+  const linkedTx = transactions.find((t) => t.id === txnId);
 
   const select = (id: string) => onChange({ accountId: accountId === id ? undefined : id, txnId });
 
   // Open the full-screen picker; it delivers the choice back through the store so
-  // this component (still mounted under the pushed screen) applies it.
+  // this component (still mounted under the pushed screen) applies it. The picked
+  // transaction's own account takes over the account chip — it's the bank the
+  // money actually moved through. Only manual txns carry `accountId` directly;
+  // notification-parsed ones (the common case) only have bank name + last-4, so
+  // fall back to the same bank/last-4 matcher used to detect orphan txns.
+  const resolveAccountId = (t: Transaction) => {
+    if (t.accountId) return t.accountId;
+    const last4 = t.account.replace(/\D/g, "").slice(-4);
+    return findMatchingAccount(accounts, t.bank, last4)?.id;
+  };
+
   const openPicker = () => {
-    usePickTxnStore.getState().request(amount ?? null, (id) => onChange({ accountId, txnId: id }));
+    usePickTxnStore.getState().request(amount ?? null, (id) => {
+      const txn = transactions.find((t) => t.id === id);
+      onChange({ accountId: (txn && resolveAccountId(txn)) ?? accountId, txnId: id, txn });
+    });
     router.push("/pick-transaction");
   };
 
@@ -66,15 +92,7 @@ export function LedgerLink({
         {label} <Text className="text-dim">(optional)</Text>
       </Text>
 
-      {/* Account chips: Cash + the user's accounts */}
-      <View className="flex-row gap-2 flex-wrap">
-        <Chip label="Cash" icon="cash-outline" selected={accountId === CASH_ACCOUNT} onPress={() => select(CASH_ACCOUNT)} />
-        {accounts.map((a) => (
-          <Chip key={a.id} label={accountLabel(a)} icon="card-outline" selected={accountId === a.id} onPress={() => select(a.id)} />
-        ))}
-      </View>
-
-      {/* Linked transaction */}
+      {/* Linked transaction — first, since picking one drives the account chip below. */}
       {linkedTx ? (
         <View
           className="flex-row items-center gap-2 rounded-[12px] px-3 py-2.5 border border-accent-purple/30"
@@ -96,6 +114,14 @@ export function LedgerLink({
           <Text className="text-xs text-muted">Link a transaction</Text>
         </TouchableOpacity>
       )}
+
+      {/* Account chips: Cash + the user's accounts — auto-selected from the txn above. */}
+      <View className="flex-row gap-2 flex-wrap">
+        <Chip label="Cash" icon="cash-outline" selected={accountId === CASH_ACCOUNT} onPress={() => select(CASH_ACCOUNT)} />
+        {accounts.map((a) => (
+          <Chip key={a.id} label={accountLabel(a)} icon="card-outline" selected={accountId === a.id} onPress={() => select(a.id)} />
+        ))}
+      </View>
     </View>
   );
 }
@@ -117,10 +143,13 @@ export function SettleSheet({
   /** Amount being settled — passed to the picker for amount matching. */
   amount?: number;
   onClose: () => void;
-  onConfirm: (refs: { accountId?: string; txnId?: string }) => void;
+  onConfirm: (refs: { accountId?: string; txnId?: string; date?: string }) => void;
 }) {
   const [accountId, setAccountId] = useState<string | undefined>();
   const [txnId, setTxnId] = useState<string | undefined>();
+  const [date, setDate] = useState<string | undefined>();
+
+  const reset = () => { setAccountId(undefined); setTxnId(undefined); setDate(undefined); };
 
   return (
     <Sheet visible={visible} onClose={onClose} keyboardAware>
@@ -133,16 +162,23 @@ export function SettleSheet({
         </View>
         <Text className="text-xs text-muted mb-4">{hint}</Text>
 
-        <LedgerLink
-          label={label}
-          accountId={accountId}
-          txnId={txnId}
-          amount={amount}
-          onChange={({ accountId: a, txnId: t }) => { setAccountId(a); setTxnId(t); }}
-        />
+        <View className="gap-4">
+          <LedgerLink
+            label={label}
+            accountId={accountId}
+            txnId={txnId}
+            amount={amount}
+            onChange={({ accountId: a, txnId: t, txn }) => {
+              setAccountId(a);
+              setTxnId(t);
+              if (txn && !date) setDate(txn.date);
+            }}
+          />
+          <DateField label="Date" value={date} onChange={setDate} />
+        </View>
 
         <TouchableOpacity
-          onPress={() => { onConfirm({ accountId, txnId }); setAccountId(undefined); setTxnId(undefined); }}
+          onPress={() => { onConfirm({ accountId, txnId, date }); reset(); }}
           className="flex-row items-center justify-center gap-2 rounded-[14px] py-3.5 mt-5 bg-accent-green"
           activeOpacity={0.85}
         >

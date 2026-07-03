@@ -183,9 +183,9 @@ export default function HomeScreen() {
                 </Text>
                 {hasRealData ? (
                   <View className="flex-row items-center gap-1">
-                    <Ionicons name="wallet-outline" size={11} color="#a855f7" />
+                    <Ionicons name="trending-up-outline" size={11} color="#a855f7" />
                     <Text className="text-xs text-accent-purple font-semibold">
-                      {accountStore.accounts.length} account{accountStore.accounts.length !== 1 ? "s" : ""} · {accountStore.assets.length} asset{accountStore.assets.length !== 1 ? "s" : ""}
+                      {accountStore.assets.length} asset{accountStore.assets.length !== 1 ? "s" : ""}
                     </Text>
                   </View>
                 ) : (
@@ -218,6 +218,9 @@ export default function HomeScreen() {
               >
                 <Text className="text-xs text-muted mb-1.5">Total Balance</Text>
                 <Text className="text-xl font-bold text-white">{fmtSigned(totalBalance)}</Text>
+                <Text className="text-xs text-dim mt-0.5">
+                  {accountStore.accounts.length} account{accountStore.accounts.length !== 1 ? "s" : ""}
+                </Text>
               </View>
               <View
                 className="flex-1 rounded-[12px] p-[14px] border border-white/[0.08]"

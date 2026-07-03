@@ -237,6 +237,24 @@ export default function AssetForm({
         </View>
       </View>
 
+      {/* Lent: link the transaction right after Type so every field below (name,
+          amount, date) can auto-fill from it. */}
+      {draft.type === "lent" && (
+        <LedgerLink
+          label="Paid from"
+          accountId={draft.fromAccountId}
+          txnId={draft.fromTxnId}
+          amount={assetValueOf(draft)}
+          onChange={({ accountId, txnId, txn }) => set({
+            fromAccountId: accountId,
+            fromTxnId: txnId,
+            name: txn && !draft.name.trim() ? txn.merchant : draft.name,
+            value: txn && !draft.value.trim() ? String(txn.amount) : draft.value,
+            startDate: txn && !draft.startDate ? txn.date : draft.startDate,
+          })}
+        />
+      )}
+
       {/* Name / scheme / person */}
       {draft.type === "mutual_fund" ? (
         <Labeled label="Scheme">
@@ -249,6 +267,7 @@ export default function AssetForm({
           phone={draft.phone}
           onChangeName={(v) => set({ name: v })}
           onChangePhone={(v) => set({ phone: v })}
+          onPick={(name, phone) => set({ name, phone })}
           namePlaceholder="e.g., Raj Sharma"
         />
       ) : (
@@ -361,10 +380,10 @@ export default function AssetForm({
         </Labeled>
       )}
 
-      {/* Which account funded this asset + optional transaction link (all types). */}
-      {draft.type !== "cash" && (
+      {/* Which account funded this asset + optional transaction link (all other types). */}
+      {draft.type !== "cash" && draft.type !== "lent" && (
         <LedgerLink
-          label={draft.type === "lent" ? "Paid from" : "Invested from"}
+          label="Invested from"
           accountId={draft.fromAccountId}
           txnId={draft.fromTxnId}
           amount={assetValueOf(draft)}
@@ -375,7 +394,7 @@ export default function AssetForm({
       {/* Start date + period — applies to every asset type. */}
       <View className="flex-row gap-3">
         <View className="flex-1">
-          <DateField label="Start date" value={draft.startDate} onChange={(iso) => set({ startDate: iso })} />
+          <DateField label={draft.type === "lent" ? "Lent Date" : "Start date"} value={draft.startDate} onChange={(iso) => set({ startDate: iso })} />
         </View>
         <View className="flex-1">
           <Labeled label="Period (months)" optional>

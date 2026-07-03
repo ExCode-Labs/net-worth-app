@@ -144,6 +144,26 @@ export default function AddLiabilityScreen() {
               </View>
             </View>
 
+            {/* Borrow: link the transaction right after Type so every field below
+                (lender, amount, date) can auto-fill from it. */}
+            {isBorrow && (
+              <LedgerLink
+                label="Received in"
+                accountId={fromAccountId}
+                txnId={fromTxnId}
+                amount={parseFloat(balance) || 0}
+                onChange={({ accountId, txnId, txn }) => {
+                  setFromAccountId(accountId);
+                  setFromTxnId(txnId);
+                  if (txn) {
+                    if (!lender.trim()) setLender(txn.merchant);
+                    if (!balance.trim()) setBalance(String(txn.amount));
+                    if (!startDate) setStartDate(txn.date);
+                  }
+                }}
+              />
+            )}
+
             {/* Name */}
             <Field
               label={isBorrow ? "Borrowed For" : isLoan ? "Loan Name" : "EMI For"}
@@ -196,10 +216,10 @@ export default function AddLiabilityScreen() {
               </View>
             )}
 
-            {/* Where the money landed: borrow received / loan credited. */}
-            {(isBorrow || isLoan) && (
+            {/* Where the money landed: loan credited (borrow is linked above). */}
+            {isLoan && (
               <LedgerLink
-                label={isBorrow ? "Received in" : "Credited to"}
+                label="Credited to"
                 accountId={fromAccountId}
                 txnId={fromTxnId}
                 amount={parseFloat(balance) || 0}
@@ -221,7 +241,7 @@ export default function AddLiabilityScreen() {
             {/* Start date + tenure */}
             <View className="flex-row gap-3">
               <View className="flex-1">
-                <DateField label="Start date" value={startDate} onChange={setStartDate} />
+                <DateField label={isBorrow ? "Borrow Date" : "Start date"} value={startDate} onChange={setStartDate} />
               </View>
               <View className="flex-1">
                 <Field label="Period (months)" optional value={period} onChange={(v) => setPeriod(v.replace(/[^0-9]/g, ""))} placeholder="e.g., 36" />

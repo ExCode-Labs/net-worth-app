@@ -22,7 +22,8 @@ import { useTransactionStore } from "@/store/transactionStore";
 import { learnCategory, categoryKey } from "@/store/categoryStore";
 import { useAccountStore, accountLabel } from "@/store/accountStore";
 import { Chip } from "@/components/ui/Chip";
-import { TX_TYPES, TX_TYPE_COLORS, CATEGORIES, type TxType } from "@/constants/categories";
+import { TX_TYPES, TX_TYPE_COLORS, type TxType } from "@/constants/categories";
+import { CategoryGrid } from "@/components/transactions/CategoryGrid";
 import { toast } from "@/store/toastStore";
 import { confirm } from "@/store/confirmStore";
 
@@ -185,31 +186,7 @@ export default function EditTransactionScreen() {
             {/* Category */}
             <View>
               <Text className="text-[11px] text-muted font-bold uppercase tracking-[0.8px] mb-[10px]">Category</Text>
-              <View className="flex-row flex-wrap gap-2">
-                {CATEGORIES[txType].map((c) => {
-                  const active = category === c.name;
-                  return (
-                    <TouchableOpacity
-                      key={c.name}
-                      onPress={() => setCategory(c.name)}
-                      className={`w-[22%] rounded-[13px] border items-center ${
-                        active ? "bg-accent-purple/[0.15] border-accent-purple" : "bg-white/[0.05] border-white/[0.08]"
-                      }`}
-                      style={{ aspectRatio: 0.9, paddingVertical: 8, paddingHorizontal: 3 }}
-                      activeOpacity={0.75}
-                    >
-                      {/* Icon fills the flexible top zone so it's centred the same
-                          in every tile regardless of how many lines the label wraps to. */}
-                      <View className="flex-1 items-center justify-center">
-                        <Ionicons name={c.icon} size={22} color={active ? color : "#6b7280"} />
-                      </View>
-                      <View className="items-center justify-center" style={{ height: 20 }}>
-                        <Text numberOfLines={2} className="text-[8px] text-center font-semibold" style={{ color: active ? color : "#6b7280", lineHeight: 10 }}>{c.name}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              <CategoryGrid txType={txType} category={category} onSelect={setCategory} activeColor={color} />
             </View>
 
             {/* Merchant */}

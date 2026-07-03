@@ -11,7 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useAccountStore, type Asset } from "@/store/accountStore";
 import { useTransactionStore } from "@/store/transactionStore";
-import { SettleSheet, accountRefLabel, txnRefLabel } from "@/components/ui/LedgerLink";
+import { SettleSheet, accountRefLabel, txnRefLabel, txnDateLabel } from "@/components/ui/LedgerLink";
 import { fmt } from "@/utils/formatters";
 import { toast } from "@/store/toastStore";
 import { confirm } from "@/store/confirmStore";
@@ -39,7 +39,7 @@ function detailRows(a: Asset): { label: string; value: string }[] {
   push("Sum Assured", d.sumAssured, (n) => fmt(n));
   push("Premium", d.premium, (n) => fmt(n));
   push("Phone", d.phone);
-  if (a.startDate) rows.push({ label: "Start date", value: new Date(a.startDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) });
+  if (a.startDate) rows.push({ label: a.type === "lent" ? "Lent Date" : "Start date", value: new Date(a.startDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) });
   if (a.periodMonths) rows.push({ label: "Period", value: `${a.periodMonths} months` });
   return rows;
 }
@@ -73,9 +73,23 @@ export default function AssetDetailScreen() {
 
   // Money-movement legs: funded-from (all types), and proceeds-to once closed.
   if (d.fromAccountId) rows.push({ label: isLent ? "Paid from" : "Invested from", value: accountRefLabel(accounts, d.fromAccountId) });
-  if (d.fromTxnId) rows.push({ label: isLent ? "Paid txn" : "Invested txn", value: txnRefLabel(transactions.find((t) => t.id === d.fromTxnId)) });
+  if (d.fromTxnId) {
+    const tx = transactions.find((t) => t.id === d.fromTxnId);
+    rows.push({ label: isLent ? "Paid txn" : "Invested txn", value: txnRefLabel(tx) });
+    const when = txnDateLabel(tx);
+    if (when) rows.push({ label: isLent ? "Paid on" : "Invested on", value: when });
+  }
   if (asset.closed && d.toAccountId) rows.push({ label: isLent ? "Returned to" : "Proceeds to", value: accountRefLabel(accounts, d.toAccountId) });
-  if (asset.closed && d.toTxnId) rows.push({ label: isLent ? "Return txn" : "Proceeds txn", value: txnRefLabel(transactions.find((t) => t.id === d.toTxnId)) });
+  if (asset.closed && d.toTxnId) {
+    const tx = transactions.find((t) => t.id === d.toTxnId);
+    rows.push({ label: isLent ? "Return txn" : "Proceeds txn", value: txnRefLabel(tx) });
+  }
+  if (asset.closed && asset.closedDate) {
+    rows.push({
+      label: isLent ? "Returned on" : "Closed on",
+      value: new Date(asset.closedDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+    });
+  }
 
   const handleDelete = () => {
     confirm({
@@ -89,7 +103,7 @@ export default function AssetDetailScreen() {
 
   const handleClose = () => {
     if (asset.closed) {
-      updateAsset(asset.id, { closed: false, details: { ...d, toAccountId: undefined, toTxnId: undefined } });
+      updateAsset(asset.id, { closed: false, closedDate: undefined, details: { ...d, toAccountId: undefined, toTxnId: undefined } });
       toast.success(isLent ? "Marked as not returned." : "Asset reopened.");
       return;
     }
@@ -97,8 +111,8 @@ export default function AssetDetailScreen() {
     setSettling(true);
   };
 
-  const handleSettle = (refs: { accountId?: string; txnId?: string }) => {
-    updateAsset(asset.id, { closed: true, details: { ...d, toAccountId: refs.accountId, toTxnId: refs.txnId } });
+  const handleSettle = (refs: { accountId?: string; txnId?: string; date?: string }) => {
+    updateAsset(asset.id, { closed: true, closedDate: refs.date, details: { ...d, toAccountId: refs.accountId, toTxnId: refs.txnId } });
     setSettling(false);
     toast.success(isLent ? "Marked as returned." : "Asset closed.");
   };

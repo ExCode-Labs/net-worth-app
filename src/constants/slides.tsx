@@ -62,7 +62,7 @@ function Slide1Visual() {
         style={S.purple}
       >
         <Image
-          source={require("../../assets/foreground.png")}
+          source={require("../../assets/logo.png")}
           style={{ width: 52, height: 52 }}
           resizeMode="contain"
         />

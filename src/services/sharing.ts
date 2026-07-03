@@ -20,6 +20,7 @@ export const SHARE_CATEGORIES: {
   icon: IconName;
 }[] = [
   { key: "balance", label: "Bank Balance", icon: "wallet-outline" },
+  { key: "transactions", label: "Transactions", icon: "swap-horizontal-outline" },
   { key: "cards", label: "Card Usage", icon: "card-outline" },
   { key: "assets", label: "Assets", icon: "trending-up-outline" },
   { key: "liabilities", label: "Liabilities", icon: "trending-down-outline" },
@@ -167,6 +168,9 @@ export interface SharedData {
     total: number;
     accounts: number;
     items: { name: string; bank: string; balance: number }[];
+  };
+  transactions?: {
+    items: { type: string; amount: number; category: string; merchant: string; date: string }[];
   };
   cards?: { cardName: string; bank: string; limit: number; usage: number }[];
   assets?: {

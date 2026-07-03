@@ -16,6 +16,7 @@ export function PersonField({
   phone,
   onChangeName,
   onChangePhone,
+  onPick,
   optional,
   namePlaceholder = "e.g., Raj Sharma",
 }: {
@@ -24,6 +25,11 @@ export function PersonField({
   phone: string;
   onChangeName: (v: string) => void;
   onChangePhone: (v: string) => void;
+  /** Called once with both values when a contact is picked. Use this instead of
+   * relying on onChangeName+onChangePhone when both fields live in one merged
+   * state object — two separate calls in the same tick would each patch off
+   * the same stale snapshot and the first update gets overwritten. */
+  onPick?: (name: string, phone: string) => void;
   optional?: boolean;
   namePlaceholder?: string;
 }) {
@@ -31,8 +37,12 @@ export function PersonField({
     try {
       const picked = await pickContact();
       if (!picked) return; // cancelled
-      onChangeName(picked.name);
-      onChangePhone(picked.phone);
+      if (onPick) {
+        onPick(picked.name, picked.phone);
+      } else {
+        onChangeName(picked.name);
+        onChangePhone(picked.phone);
+      }
     } catch (e) {
       toast.error(e instanceof Error && e.message ? e.message : "Couldn't open contacts.");
     }

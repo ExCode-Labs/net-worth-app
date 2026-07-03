@@ -34,12 +34,14 @@ export default function ShareConfigScreen() {
   const cards       = useCardStore((s) => s.cards);
   const liabilities = useLiabilityStore((s) => s.liabilities);
 
-  // Owner's own items, grouped by share category.
+  // Owner's own items, grouped by share category. "transactions" picks from the
+  // same accounts as "balance" — it decides whose transaction history to reveal.
   const itemsByCat = useMemo<Record<string, Item[]>>(() => ({
-    balance:     accounts.map((a) => ({ id: a.id, label: accountLabel(a), sub: a.bank, amount: a.balance })),
-    cards:       cards.map((c) => ({ id: c.id, label: c.cardName, sub: c.bank, amount: c.usage })),
-    assets:      assets.filter((a) => !a.closed).map((a) => ({ id: a.id, label: a.name, sub: a.type, amount: a.value })),
-    liabilities: liabilities.map((l) => ({ id: l.id, label: l.name, sub: l.type, amount: l.balance })),
+    balance:      accounts.map((a) => ({ id: a.id, label: accountLabel(a), sub: a.bank, amount: a.balance })),
+    transactions: accounts.map((a) => ({ id: a.id, label: accountLabel(a), sub: a.bank, amount: a.balance })),
+    cards:        cards.map((c) => ({ id: c.id, label: c.cardName, sub: c.bank, amount: c.usage })),
+    assets:       assets.filter((a) => !a.closed).map((a) => ({ id: a.id, label: a.name, sub: a.type, amount: a.value })),
+    liabilities:  liabilities.map((l) => ({ id: l.id, label: l.name, sub: l.type, amount: l.balance })),
   }), [accounts, cards, assets, liabilities]);
 
   // Seed from the existing share. Legacy shares have a category but no item list

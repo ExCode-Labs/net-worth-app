@@ -13,6 +13,7 @@ import { router } from "expo-router";
 import MonthCalendar, { dayKey, type DayTotal } from "@/components/transactions/MonthCalendar";
 import { Chip } from "@/components/ui/Chip";
 import { useTransactionStore, type Transaction } from "@/store/transactionStore";
+import { CATEGORIES, type TxType } from "@/constants/categories";
 import { confirm } from "@/store/confirmStore";
 import { toast } from "@/store/toastStore";
 import { useAccountStore, isOrphanTransaction } from "@/store/accountStore";
@@ -28,10 +29,17 @@ import { useAmountVisibilitySync } from "@/store/prefsStore";
 type Filter = "All" | "Expense" | "Income" | "Transfer";
 const FILTERS: Filter[] = ["All", "Expense", "Income", "Transfer"];
 
+/** Icon for a transaction's category, falling back to a generic receipt when the
+ * category isn't one of the known ones (e.g. renamed/removed since it was saved). */
+function categoryIcon(type: TxType, category: string): React.ComponentProps<typeof Ionicons>["name"] {
+  return CATEGORIES[type]?.find((c) => c.name === category)?.icon ?? "receipt-outline";
+}
+
 // ── Main Screen ───────────────────────────────────────────────────────────────
 export default function TransactionsScreen() {
   useAmountVisibilitySync();
   const [filter,      setFilter]      = useState<Filter>("All");
+  const [categoryFilter, setCategoryFilter] = useState<string>("All");
   const [search,      setSearch]      = useState("");
   const [filterOpen,  setFilterOpen]  = useState(false);
   const [mode,        setMode]        = useState<"list" | "calendar">("list");
@@ -84,7 +92,7 @@ export default function TransactionsScreen() {
 
   const displayList = useMemo(() => linked.map((t) => ({
     id:     t.id,
-    icon:   "receipt-outline" as const,
+    icon:   categoryIcon(t.type, t.category),
     name:   t.merchant,
     cat:    t.category,
     note:   t.note,
@@ -95,14 +103,20 @@ export default function TransactionsScreen() {
     type:   t.type,
   })), [linked]);
 
+  const categoriesUsed = useMemo(() => {
+    const inType = displayList.filter((t) => filter === "All" || t.type === filter);
+    return Array.from(new Set(inType.map((t) => t.cat))).filter(Boolean).sort();
+  }, [displayList, filter]);
+
   const filtered = useMemo(() => displayList.filter(
     (t) =>
       (filter === "All" || t.type === filter) &&
+      (categoryFilter === "All" || t.cat === categoryFilter) &&
       (!search ||
         t.name.toLowerCase().includes(search.toLowerCase()) ||
         t.cat.toLowerCase().includes(search.toLowerCase()) ||
         String(Math.abs(t.amount)).includes(search)),
-  ), [displayList, filter, search]);
+  ), [displayList, filter, categoryFilter, search]);
 
   const { groups, totalExpense, totalIncome, dayTotals } = useMemo(() => {
     const spend = filtered.filter((t) => t.type !== "Transfer");
@@ -203,9 +217,28 @@ export default function TransactionsScreen() {
         {filterOpen && (
           <View className="flex-row flex-wrap gap-2 px-5 pb-3">
             {FILTERS.map((f) => (
-              <Chip key={f} label={f} selected={filter === f} onPress={() => setFilter(f)} />
+              <Chip
+                key={f}
+                label={f}
+                selected={filter === f}
+                onPress={() => { setFilter(f); setCategoryFilter("All"); }}
+              />
             ))}
           </View>
+        )}
+
+        {/* Category filter — horizontally scrollable since there can be many */}
+        {filterOpen && categoriesUsed.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingHorizontal: 20, paddingBottom: 12 }}
+          >
+            <Chip label="All categories" selected={categoryFilter === "All"} onPress={() => setCategoryFilter("All")} />
+            {categoriesUsed.map((c) => (
+              <Chip key={c} label={c} selected={categoryFilter === c} onPress={() => setCategoryFilter(c)} />
+            ))}
+          </ScrollView>
         )}
 
         {/* Notification opt-in */}
