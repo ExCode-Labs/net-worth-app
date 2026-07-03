@@ -4,17 +4,20 @@
  * with completely different text, so notifDedup's exact-text match can't catch
  * it. Two tiers, in order of reliability:
  *
- *   1. Reference match — both notifications carry the same UPI Ref / RRN / Txn
- *      ID (see bankMessageParser.extractRef). Same ref = same payment, full
- *      stop, regardless of arrival time. This is the primary key.
- *   2. Time-window fallback — for the minority of alerts that state no ref
- *      (some interest payouts, terse bank formats): same amount + direction that
- *      ARRIVED within a couple of minutes. Measured against real arrival time
+ *   1. When the incoming message states a reference (UPI Ref / RRN / Txn ID —
+ *      see bankMessageParser.extractRef), the decision is PURELY ref-based: it's
+ *      a duplicate iff an existing notification txn carries the same ref. A
+ *      different (or absent) stored ref means a genuinely different payment —
+ *      two distinct UPI transfers never share a reference — so it is captured
+ *      even if the amount and arrival time coincide. No time window applies.
+ *   2. Only when the incoming message states NO ref do we fall back to a coarse
+ *      amount + direction + arrival-time window (some interest payouts, terse
+ *      bank formats carry no ref). Measured against real arrival time
  *      (`ingestedAt`), NOT the message's stated date — bank SMSes are frequently
- *      day-granular, so two genuinely different same-amount payments on one day
- *      would both collapse to midnight and wrongly dedupe if compared by date.
+ *      day-granular, so two different same-amount payments on one day would both
+ *      collapse to midnight and wrongly dedupe if compared by date.
  *
- * ponytail: the time fallback can still merge two genuine ref-less same-amount
+ * ponytail: the ref-less time fallback can still merge two genuine same-amount
  * payments within ~2 min — rare, and far better than double-counting every UPI
  * transfer (bank SMS + app alert) as the default.
  *
@@ -41,10 +44,12 @@ export function isCrossSourceDuplicate(
 ): boolean {
   const notifs = transactions.filter((t) => t.source === "notification");
 
-  // 1. Exact reference match — the same payment, whenever it arrived.
-  if (ref && notifs.some((t) => t.ref === ref)) return true;
+  // 1. Ref stated → decision is purely ref-based. A matching stored ref is the
+  //    same payment; anything else is a different one, so DON'T fall through to
+  //    the time window (which would wrongly merge distinct same-amount payments).
+  if (ref) return notifs.some((t) => t.ref === ref);
 
-  // 2. Fallback: same amount + direction arrived within the window.
+  // 2. No ref → coarse amount + direction + arrival-time window.
   return notifs.some((existing) => {
     if (existing.ingestedAt == null) return false; // pre-existing txns without an arrival time can't be compared
     if (existing.amount !== amount) return false;

@@ -18,8 +18,10 @@ const withRef: DuplicateCandidate[] = [
 ];
 // Same ref = same payment, even hours later and even if the amount were misread.
 eq(isCrossSourceDuplicate(withRef, 500, false, "142923550637", T0 + 6 * 60 * 60_000), true, "same ref, 6h later → duplicate");
-// Different ref, same amount, outside the time window → not a duplicate.
-eq(isCrossSourceDuplicate(withRef, 500, false, "999999999999", T0 + 30 * 60_000), false, "different ref, 30 min later → not a duplicate");
+// A stated, different ref is a DIFFERENT payment — captured even at the same
+// amount seconds later. This is the fix for repeated captures being dropped.
+eq(isCrossSourceDuplicate(withRef, 500, false, "999999999999", T0 + 10_000), false, "different ref, same amount 10s later → captured");
+eq(isCrossSourceDuplicate(withRef, 500, false, "999999999999", T0 + 30 * 60_000), false, "different ref, 30 min later → captured");
 
 // ── Time-window fallback (no ref stated) ─────────────────────────────────────
 const noRef: DuplicateCandidate[] = [
