@@ -35,6 +35,13 @@
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "647898738704-m7e1nhod869hoa46l62bpp9r9l9g2t7q.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_APP_CLIENT_ID": "647898738704-bfjdh64o3osml9171olacf7jvdg2h711.apps.googleusercontent.com"
       }
+    },
+    "production-apk-arm64": {
+      "extends": "production-apk",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=arm64-v8a"
+      }
     }
   },
   "submit": {
