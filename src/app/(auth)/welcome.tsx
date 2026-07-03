@@ -7,8 +7,8 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Dimensions,
   FlatList,
+  useWindowDimensions,
   type ViewToken,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,18 +19,23 @@ import { useAuthStore } from "@/store/authStore";
 import { SLIDES, type Slide } from "@/constants/slides";
 import { S } from "@/constants/theme";
 
-const { width: W } = Dimensions.get("window");
 const VIEWABILITY_CONFIG = { viewAreaCoveragePercentThreshold: 50 };
 
 export default function WelcomeScreen() {
+  const { width: W } = useWindowDimensions();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatRef = useRef<FlatList<Slide>>(null);
+  const scrolling = useRef(false);
   const { completeWelcome } = useAuthStore();
 
   const isLast = currentIndex === SLIDES.length - 1;
 
-  const scrollTo = (index: number) =>
+  const scrollTo = (index: number) => {
+    if (scrolling.current) return; // ignore taps while a scroll animation is in flight — re-entrant scrollToIndex desyncs FlatList's offset tracking
+    scrolling.current = true;
     flatRef.current?.scrollToIndex({ index, animated: true });
+    setTimeout(() => { scrolling.current = false; }, 350);
+  };
 
   const handleNext = async () => {
     if (!isLast) {
@@ -61,6 +66,11 @@ export default function WelcomeScreen() {
     offset: W * index,
     index,
   });
+
+  const onScrollToIndexFailed = (info: { index: number }) => {
+    // getItemLayout offset can be briefly stale right after a width change; retry once the list settles instead of leaving it in a broken state.
+    setTimeout(() => flatRef.current?.scrollToIndex({ index: info.index, animated: false }), 50);
+  };
 
   const renderSlide = ({ item }: { item: Slide }) => (
     <View className="flex-1 px-6" style={{ width: W }}>
@@ -138,6 +148,8 @@ export default function WelcomeScreen() {
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={VIEWABILITY_CONFIG}
         getItemLayout={getItemLayout}
+        onScrollToIndexFailed={onScrollToIndexFailed}
+        removeClippedSubviews={false}
         style={{ flex: 1 }}
       />
 
