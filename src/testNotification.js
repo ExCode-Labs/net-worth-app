@@ -260,7 +260,44 @@ const smsList = [
   },
 ];
 
+const smsLists = [
+  {
+    sender: "VM-KOTAKB-S",
+    message:
+      "Received Rs.4.12 in your Kotak Bank AC X2849 from rohit0620@upi on 03-07-26.UPI Ref:142923550637.",
+  },
+];
+
 // =====================================================
+
+// When true, the transaction reference number in each message (UPI Ref / RRN /
+// Txn ID / UPI/DR/… block) is replaced with a fresh random number of the same
+// length before sending. The app dedupes notifications by that ref, so keep this
+// ON to re-send the same message repeatedly and have each one captured as a new
+// transaction. Messages without a ref are left unchanged (the app then falls
+// back to a short time-window dedup). Set to false to send verbatim.
+const RANDOMISE_REF = true;
+
+// Same patterns the app uses in extractRef() — capture group 1 is the prefix,
+// group 2 the ref digits (so we can swap only the digits).
+const REF_PATTERNS = [
+  /(\bUPI\s*Ref(?:erence)?\s*(?:no\.?)?\s*[:\-]?\s*)(\d{6,})/i,
+  /(\b(?:ref(?:erence)?|rrn|utr)\s*(?:no\.?|number)?\s*[:\-]?\s*)(\d{6,})/i,
+  /(\btxn\s*id\s*[:\-]?\s*)(\d{6,})/i,
+  /(\bUPI[:/](?:[A-Za-z]{2,4}\/)?)(\d{6,})/i,
+];
+
+const randDigits = (n) =>
+  Array.from({ length: n }, () => Math.floor(Math.random() * 10)).join("");
+
+function randomiseRef(message) {
+  for (const re of REF_PATTERNS) {
+    if (re.test(message)) {
+      return message.replace(re, (_, prefix, digits) => prefix + randDigits(digits.length));
+    }
+  }
+  return message; // no ref in this message → leave it untouched
+}
 
 const INTERVAL = 5000;
 
@@ -280,7 +317,8 @@ function getRandomMessages(list, count = 5) {
 const messages = getRandomMessages(smsList, 5);
 
 function sendSms(sender, message) {
-  const escapedMessage = message.replace(/"/g, '\\"');
+  const finalMessage = RANDOMISE_REF ? randomiseRef(message) : message;
+  const escapedMessage = finalMessage.replace(/"/g, '\\"');
 
   const command = `adb emu sms send ${sender} "${escapedMessage}"`;
 
@@ -293,7 +331,7 @@ function sendSms(sender, message) {
     console.log("======================================");
     console.log(`SMS ${index + 1}/${messages.length}`);
     console.log(`Sender : ${sender}`);
-    console.log(`Message: ${message}`);
+    console.log(`Message: ${finalMessage}`);
     console.log("======================================");
   });
 }
