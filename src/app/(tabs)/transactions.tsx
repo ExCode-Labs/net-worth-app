@@ -78,8 +78,8 @@ export default function TransactionsScreen() {
   }, [transactions, accounts, cards]);
 
   const { missingAccounts, missingCards } = useMemo(() => {
-    const distinctTargets = (rows: typeof orphanAccounts) =>
-      Array.from(
+    const distinctTargets = (rows: typeof orphanAccounts) => {
+      const targets = Array.from(
         new Map(
           rows.map((t) => {
             const last4 = t.account.replace(/\D/g, "").slice(-4);
@@ -87,6 +87,14 @@ export default function TransactionsScreen() {
           }),
         ).values(),
       );
+      // Some alerts for a bank carry no account number (e.g. a cashback/interest
+      // notice), producing a bank-only target alongside the real "••1234" one.
+      // Both resolve to the same account once added (bank-name fallback match),
+      // so drop the bank-only chip when a last-4 target for that bank exists —
+      // showing both is a confusing duplicate.
+      const banksWithLast4 = new Set(targets.filter((t) => t.last4).map((t) => t.bank));
+      return targets.filter((t) => t.last4 || !banksWithLast4.has(t.bank));
+    };
     return { missingAccounts: distinctTargets(orphanAccounts), missingCards: distinctTargets(orphanCards) };
   }, [orphanAccounts, orphanCards]);
 
