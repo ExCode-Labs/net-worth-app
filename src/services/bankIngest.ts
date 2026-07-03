@@ -27,8 +27,9 @@ import { useCardStore, findMatchingCard, type Card } from "@/store/cardStore";
 import { useTransactionStore, type Transaction } from "@/store/transactionStore";
 import { resolvePayee } from "@/store/payeeStore";
 import { resolveCategory } from "@/store/categoryStore";
+import { isCrossSourceDuplicate } from "./duplicateNotification";
 
-export type IngestOutcome = "applied" | "recorded" | "skipped";
+export type IngestOutcome = "applied" | "recorded" | "skipped" | "duplicate";
 
 export interface IngestSummary {
   applied:  number; // matched an account → balance updated
@@ -67,11 +68,16 @@ function nextBalance(account: Account, p: ParsedBankTxn): number {
     : account.balance - p.amount;
 }
 
+function isDuplicateOfExisting(amount: number, isCredit: boolean, occurredAt: string): boolean {
+  return isCrossSourceDuplicate(useTransactionStore.getState().transactions, amount, isCredit, occurredAt);
+}
+
 /** Ingest a single raw message. `sender` is the notification title/SMS sender,
  *  used to identify the bank. Returns what happened to it. */
 export function ingestBankMessage(raw: string, receivedAtMs?: number, sender?: string): IngestOutcome {
   const parsed = parseBankMessage(raw, receivedAtMs, sender);
   if (!parsed) return "skipped";
+  if (isDuplicateOfExisting(parsed.amount, parsed.direction === "credit", parsed.occurredAt)) return "duplicate";
 
   const { accounts } = useAccountStore.getState();
 
@@ -144,6 +150,7 @@ function cardToTransaction(p: ParsedCardTxn): Omit<Transaction, "id"> {
 export function ingestCardMessage(raw: string, receivedAtMs?: number, sender?: string): IngestOutcome {
   const parsed = parseCardMessage(raw, receivedAtMs, sender);
   if (!parsed) return "skipped";
+  if (isDuplicateOfExisting(parsed.amount, parsed.direction === "payment", parsed.occurredAt)) return "duplicate";
 
   const card = findMatchingCard(useCardStore.getState().cards, parsed.bank, parsed.cardLast4);
 
