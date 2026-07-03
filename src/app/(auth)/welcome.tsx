@@ -28,6 +28,12 @@ import { S } from "@/constants/theme";
 export default function WelcomeScreen() {
   const { width: W } = useWindowDimensions();
   const [currentIndex, setCurrentIndex] = useState(0);
+  // Measured viewport height of the slides area. Each page is sized to this
+  // explicitly — inside a HORIZONTAL ScrollView a page's height otherwise comes
+  // from stretch against a content-derived height, a circular dependency that
+  // collapses the inner flex-1 to zero on re-layout (the "shrinks to a corner,
+  // rest blank" bug when scrolling back). An explicit height removes it.
+  const [slideH, setSlideH] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const { completeWelcome } = useAuthStore();
 
@@ -85,53 +91,56 @@ export default function WelcomeScreen() {
       </View>
 
       {/* Slides */}
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        bounces={false}
-        scrollEventThrottle={16}
-        onMomentumScrollEnd={onMomentumScrollEnd}
-        style={{ flex: 1 }}
-      >
-        {SLIDES.map((item) => (
-          <View key={item.id} className="flex-1 px-6" style={{ width: W }}>
-            {/* Visual area */}
-            <View className="flex-1 items-center justify-center py-4">
-              <item.Visual />
-            </View>
+      <View className="flex-1" onLayout={(e) => setSlideH(e.nativeEvent.layout.height)}>
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          bounces={false}
+          scrollEventThrottle={16}
+          onMomentumScrollEnd={onMomentumScrollEnd}
+        >
+          {SLIDES.map((item) => (
+            // Explicit width × height per page — no flex on the page itself, so
+            // neither axis depends on content sizing inside the horizontal scroll.
+            <View key={item.id} className="px-6" style={{ width: W, height: slideH }}>
+              {/* Visual area */}
+              <View className="flex-1 items-center justify-center py-4">
+                <item.Visual />
+              </View>
 
-            {/* Text area */}
-            <View className="pb-3">
-              <Text
-                className="text-[11px] font-extrabold tracking-[2px] mb-2"
-                style={{ color: item.accent }}
-              >
-                {item.tag}
-              </Text>
-              <Text className="text-[28px] font-extrabold text-white leading-[36px] mb-2">
-                {item.headline}
-              </Text>
-              <Text className="text-sm text-secondary leading-[21px] mb-3">
-                {item.sub}
-              </Text>
-              {item.highlights && (
-                <View className="gap-[7px]">
-                  {item.highlights.map((h) => (
-                    <View key={h.text} className="flex-row items-center gap-2.5">
-                      <Ionicons name={h.icon} size={14} color="#6b7280" />
-                      <Text className="text-sm text-muted leading-[20px]">
-                        {h.text}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              )}
+              {/* Text area */}
+              <View className="pb-3">
+                <Text
+                  className="text-[11px] font-extrabold tracking-[2px] mb-2"
+                  style={{ color: item.accent }}
+                >
+                  {item.tag}
+                </Text>
+                <Text className="text-[28px] font-extrabold text-white leading-[36px] mb-2">
+                  {item.headline}
+                </Text>
+                <Text className="text-sm text-secondary leading-[21px] mb-3">
+                  {item.sub}
+                </Text>
+                {item.highlights && (
+                  <View className="gap-[7px]">
+                    {item.highlights.map((h) => (
+                      <View key={h.text} className="flex-row items-center gap-2.5">
+                        <Ionicons name={h.icon} size={14} color="#6b7280" />
+                        <Text className="text-sm text-muted leading-[20px]">
+                          {h.text}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
             </View>
-          </View>
-        ))}
-      </ScrollView>
+          ))}
+        </ScrollView>
+      </View>
 
       {/* Bottom bar */}
       <Animated.View
