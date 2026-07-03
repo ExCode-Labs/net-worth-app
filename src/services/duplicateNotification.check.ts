@@ -10,25 +10,36 @@ function eq(actual: unknown, expected: unknown, label: string) {
   if (actual !== expected) { failures++; console.error(`FAIL ${label}: got ${JSON.stringify(actual)}, want ${JSON.stringify(expected)}`); }
 }
 
-const existing: DuplicateCandidate[] = [
-  { source: "notification", amount: 500, type: "Expense", date: "2026-06-05T14:30:00.000Z" },
+const T0 = 1_000_000_000_000; // arbitrary epoch ms of the first arrival
+
+// ── Reference match (primary) ────────────────────────────────────────────────
+const withRef: DuplicateCandidate[] = [
+  { source: "notification", amount: 500, type: "Expense", ref: "142923550637", ingestedAt: T0 },
 ];
+// Same ref = same payment, even hours later and even if the amount were misread.
+eq(isCrossSourceDuplicate(withRef, 500, false, "142923550637", T0 + 6 * 60 * 60_000), true, "same ref, 6h later → duplicate");
+// Different ref, same amount, outside the time window → not a duplicate.
+eq(isCrossSourceDuplicate(withRef, 500, false, "999999999999", T0 + 30 * 60_000), false, "different ref, 30 min later → not a duplicate");
 
-// Same amount/direction, 90s later — BHIM + SMS for the same UPI transfer.
-eq(isCrossSourceDuplicate(existing, 500, false, "2026-06-05T14:31:30.000Z"), true, "same payment, 90s apart");
-
-// Same amount/direction, well outside the window — a genuinely later txn.
-eq(isCrossSourceDuplicate(existing, 500, false, "2026-06-05T15:00:00.000Z"), false, "same amount, 30 min later");
-
-// Different amount within the window — not a duplicate.
-eq(isCrossSourceDuplicate(existing, 700, false, "2026-06-05T14:31:00.000Z"), false, "different amount");
-
-// Same amount but opposite direction (credit vs debit) — not a duplicate.
-eq(isCrossSourceDuplicate(existing, 500, true, "2026-06-05T14:31:00.000Z"), false, "opposite direction");
-
-// Manually-entered txn of the same amount shouldn't suppress a real notification txn.
-const manual: DuplicateCandidate[] = [{ source: "manual", amount: 500, type: "Expense", date: "2026-06-05T14:30:00.000Z" }];
-eq(isCrossSourceDuplicate(manual, 500, false, "2026-06-05T14:30:30.000Z"), false, "manual entry doesn't count as a source duplicate");
+// ── Time-window fallback (no ref stated) ─────────────────────────────────────
+const noRef: DuplicateCandidate[] = [
+  { source: "notification", amount: 500, type: "Expense", ingestedAt: T0 },
+];
+// Same amount/direction, arrived 30s later, neither states a ref → dedupe by time.
+eq(isCrossSourceDuplicate(noRef, 500, false, null, T0 + 30_000), true, "no ref, same payment 30s apart");
+// Regression: two different same-amount payments the SAME day used to collapse
+// (both compared at midnight). Now keyed on real arrival time → captured.
+eq(isCrossSourceDuplicate(noRef, 500, false, null, T0 + 4 * 60 * 60_000), false, "no ref, same amount 4h later → different payment");
+// Different amount within the window → not a duplicate.
+eq(isCrossSourceDuplicate(noRef, 700, false, null, T0 + 20_000), false, "different amount");
+// Opposite direction → not a duplicate.
+eq(isCrossSourceDuplicate(noRef, 500, true, null, T0 + 20_000), false, "opposite direction");
+// Existing txn without an arrival time can't be time-compared.
+const noTime: DuplicateCandidate[] = [{ source: "notification", amount: 500, type: "Expense" }];
+eq(isCrossSourceDuplicate(noTime, 500, false, null, T0), false, "existing txn without ingestedAt is skipped");
+// Manual entry never counts as a source duplicate.
+const manual: DuplicateCandidate[] = [{ source: "manual", amount: 500, type: "Expense", ref: "142923550637", ingestedAt: T0 }];
+eq(isCrossSourceDuplicate(manual, 500, false, "142923550637", T0 + 20_000), false, "manual entry doesn't count, even with matching ref");
 
 if (failures) throw new Error(`${failures} duplicateNotification check(s) failed`);
 

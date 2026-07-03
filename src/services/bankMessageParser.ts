@@ -26,6 +26,7 @@ export interface ParsedBankTxn {
   counterparty: string;
   occurredAt:   string;       // ISO string
   balance:      number | null;
+  ref:          string | null; // UPI Ref / RRN / Txn ID — cross-source dedup key
   confidence:   "high" | "low";
   raw:          string;
 }
@@ -38,6 +39,7 @@ export interface ParsedCardTxn {
   direction:   "spend" | "payment";   // spend raises usage, payment lowers it
   merchant:    string;
   occurredAt:  string;
+  ref:         string | null; // UPI Ref / RRN / Txn ID — cross-source dedup key
   raw:         string;
 }
 
@@ -238,6 +240,28 @@ function extractBalance(text: string): number | null {
   return m ? num(m[1]) : null;
 }
 
+/**
+ * Transaction reference number (UPI Ref / RRN / Txn ID / Ref No / UPI RRN in a
+ * UPI/DR/<n> block). The SAME payment's bank SMS and UPI-app alert carry the
+ * same reference, so this is the most reliable cross-source dedup key. Returns
+ * null when the message states no reference (→ caller falls back to a
+ * time-window heuristic).
+ */
+export function extractRef(raw: string): string | null {
+  const text = normalize(raw);
+  const patterns = [
+    /\bUPI\s*Ref(?:erence)?\s*(?:no\.?)?\s*[:\-]?\s*(\d{6,})/i,        // UPI Ref:142923550637 / UPI Ref no 200144008738
+    /\b(?:ref(?:erence)?|rrn|utr)\s*(?:no\.?|number)?\s*[:\-]?\s*(\d{6,})/i, // Ref No 1835…, RRN:652…, Ref-609…
+    /\btxn\s*id\s*[:\-]?\s*(\d{6,})/i,                                // Txn ID 104540349964
+    /\bUPI[:/](?:[A-Za-z]{2,4}\/)?(\d{6,})/i,                         // UPI:075449622956, UPI/DR/194655699613
+  ];
+  for (const re of patterns) {
+    const m = text.match(re);
+    if (m) return m[1];
+  }
+  return null;
+}
+
 function extractDirection(text: string): TxnDirection | null {
   if (/\b(credited|received|deposit(?:ed)?)\b/i.test(text)) return "credit";
   if (/\b(debited|deducted|withdrawn|sent|spent|paid|debit)\b/i.test(text)) return "debit";
@@ -345,6 +369,7 @@ export function parseBankMessage(
     counterparty,
     occurredAt: extractDate(text, receivedAtMs),
     balance:    extractBalance(text),
+    ref:        extractRef(text),
     confidence: counterparty && (accountLast4 || bank !== "Unknown") ? "high" : "low",
     raw:        text,
   };
@@ -401,6 +426,7 @@ export function parseCardMessage(
     direction,
     merchant:   extractCardMerchant(text),
     occurredAt: extractDate(text, receivedAtMs),
+    ref:        extractRef(text),
     raw:        text,
   };
 }

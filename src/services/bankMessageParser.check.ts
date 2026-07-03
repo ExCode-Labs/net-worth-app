@@ -4,7 +4,7 @@
  * Asserts the counterparty + credit-card detection for each bank whose quirks
  * live in BANK_RULES, so a bad edit to the table fails loudly.
  */
-import { parseBankMessage, parseCardMessage } from "./bankMessageParser";
+import { parseBankMessage, parseCardMessage, extractRef } from "./bankMessageParser";
 
 let failures = 0;
 function eq(actual: unknown, expected: unknown, label: string) {
@@ -47,6 +47,17 @@ eq(cp("Rs.90 debited A/c X1234 to someone@okaxis on 05-Jun-26"), "someone@okaxis
   eq(d?.getDate(), 5, "occurredAt local date");
   eq(d?.getMonth(), 5, "occurredAt local month (Jun=5)");
 }
+
+// Reference extraction — the cross-source dedup key. Cover the label variants
+// and the ref-less messages that must fall back to the time heuristic (null).
+eq(extractRef("Received Rs.4.12 in your Kotak Bank AC X2849 from rohit0620@upi on 03-07-26.UPI Ref:142923550637."), "142923550637", "UPI Ref: colon");
+eq(extractRef("IMPS INR 20,000.00 sent from HDFC Bank A/c XX2590 To A/c xxxxxxxxxx4753 Ref-609041670950"), "609041670950", "Ref- hyphen");
+eq(extractRef("credited by Rs.10000.00 transfer from RahulKumar Ref No 183501606345 -SBI"), "183501606345", "Ref No");
+eq(extractRef("A/C XXXXXXXX4103 debited by Rs 500.00 towards x@ptsbi. RRN:652323144372."), "652323144372", "RRN");
+eq(extractRef("Rs.199.00 debited from Airtel Payments Bank a/c Txn ID 104540349964 Bal:0.00"), "104540349964", "Txn ID");
+eq(extractRef("Rs.690.00 Sent from x4753 Info: UPI/DR/194655699613/Mr Durgesh."), "194655699613", "UPI/DR/ block");
+eq(extractRef("Credited INR 1.00 to A/c X5024 Ref MONTHLY INTEREST PAYOUT. Bal INR 1,001.00."), null, "no numeric ref → null (time fallback)");
+eq(extractRef("Debit INR 6000.00 Axis Bank A/c XX6127 MOB/TPFT/SHRAVAN KUMAR/917."), null, "short trailing digits are not a ref → null");
 
 if (failures) throw new Error(`${failures} bankMessageParser check(s) failed`);
 

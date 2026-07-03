@@ -38,7 +38,7 @@ export interface IngestSummary {
 }
 
 /** Build a store Transaction (sans id) from a parsed bank txn. */
-function toTransaction(p: ParsedBankTxn): Omit<Transaction, "id"> {
+function toTransaction(p: ParsedBankTxn, ingestedAt: number): Omit<Transaction, "id"> {
   const merchant = resolvePayee(p.counterparty) || "Unknown";
   // "Others" is the shared catch-all in both the Expense and Income category
   // lists — a made-up name here (e.g. "Income") wouldn't match any entry in
@@ -57,6 +57,8 @@ function toTransaction(p: ParsedBankTxn): Omit<Transaction, "id"> {
     status:     "confirmed",
     rawText:    p.raw,
     confidence: p.confidence,
+    ref:        p.ref ?? undefined,
+    ingestedAt,
   };
 }
 
@@ -68,8 +70,8 @@ function nextBalance(account: Account, p: ParsedBankTxn): number {
     : account.balance - p.amount;
 }
 
-function isDuplicateOfExisting(amount: number, isCredit: boolean, occurredAt: string): boolean {
-  return isCrossSourceDuplicate(useTransactionStore.getState().transactions, amount, isCredit, occurredAt);
+function isDuplicateOfExisting(amount: number, isCredit: boolean, ref: string | null, nowMs: number): boolean {
+  return isCrossSourceDuplicate(useTransactionStore.getState().transactions, amount, isCredit, ref, nowMs);
 }
 
 /** Ingest a single raw message. `sender` is the notification title/SMS sender,
@@ -77,7 +79,10 @@ function isDuplicateOfExisting(amount: number, isCredit: boolean, occurredAt: st
 export function ingestBankMessage(raw: string, receivedAtMs?: number, sender?: string): IngestOutcome {
   const parsed = parseBankMessage(raw, receivedAtMs, sender);
   if (!parsed) return "skipped";
-  if (isDuplicateOfExisting(parsed.amount, parsed.direction === "credit", parsed.occurredAt)) return "duplicate";
+  // Dedup against the real arrival time (when the notification landed), not the
+  // message's stated date — see duplicateNotification.ts.
+  const nowMs = receivedAtMs ?? Date.now();
+  if (isDuplicateOfExisting(parsed.amount, parsed.direction === "credit", parsed.ref, nowMs)) return "duplicate";
 
   const { accounts } = useAccountStore.getState();
 
@@ -86,7 +91,7 @@ export function ingestBankMessage(raw: string, receivedAtMs?: number, sender?: s
   if (account) {
     // accountId is reference-only here (drives sharing/display) — it never
     // feeds back into balance math, since applyTxBalance bails on non-manual txns.
-    useTransactionStore.getState().addTransaction({ ...toTransaction(parsed), accountId: account.id });
+    useTransactionStore.getState().addTransaction({ ...toTransaction(parsed, nowMs), accountId: account.id });
     useAccountStore.getState().updateAccount(account.id, { balance: nextBalance(account, parsed) });
     return "applied";
   }
@@ -106,7 +111,7 @@ export function ingestBankMessage(raw: string, receivedAtMs?: number, sender?: s
       ? accounts.find((a) => a.id === debitCard.linkedAccountId)
       : undefined;
     const txn = {
-      ...toTransaction(parsed),
+      ...toTransaction(parsed, nowMs),
       account: `Card ••${parsed.accountLast4 || debitCard.last4}`,
       cardId: debitCard.id,
       accountId: linked?.id, // reference-only, same as above — for sharing/display
@@ -120,12 +125,12 @@ export function ingestBankMessage(raw: string, receivedAtMs?: number, sender?: s
   }
 
   // No match — log the transaction without touching any balance.
-  useTransactionStore.getState().addTransaction(toTransaction(parsed));
+  useTransactionStore.getState().addTransaction(toTransaction(parsed, nowMs));
   return "recorded";
 }
 
 /** Build a store Transaction (sans id) from a parsed card txn. */
-function cardToTransaction(p: ParsedCardTxn): Omit<Transaction, "id"> {
+function cardToTransaction(p: ParsedCardTxn, ingestedAt: number): Omit<Transaction, "id"> {
   const merchant = resolvePayee(p.merchant) || "Unknown";
   // Same reasoning as toTransaction() above — "Card Payment"/"Card Spend" aren't
   // real categories, so they'd show no icon and couldn't be picked in the editor.
@@ -143,6 +148,8 @@ function cardToTransaction(p: ParsedCardTxn): Omit<Transaction, "id"> {
     status:     "confirmed",
     rawText:    p.raw,
     confidence: p.merchant ? "high" : "low",
+    ref:        p.ref ?? undefined,
+    ingestedAt,
   };
 }
 
@@ -150,13 +157,14 @@ function cardToTransaction(p: ParsedCardTxn): Omit<Transaction, "id"> {
 export function ingestCardMessage(raw: string, receivedAtMs?: number, sender?: string): IngestOutcome {
   const parsed = parseCardMessage(raw, receivedAtMs, sender);
   if (!parsed) return "skipped";
-  if (isDuplicateOfExisting(parsed.amount, parsed.direction === "payment", parsed.occurredAt)) return "duplicate";
+  const nowMs = receivedAtMs ?? Date.now();
+  if (isDuplicateOfExisting(parsed.amount, parsed.direction === "payment", parsed.ref, nowMs)) return "duplicate";
 
   const card = findMatchingCard(useCardStore.getState().cards, parsed.bank, parsed.cardLast4);
 
   // Stamp cardId immediately when the card is known, so this transaction is
   // never picked up by replayForNewCard and double-counted.
-  const txData = cardToTransaction(parsed);
+  const txData = cardToTransaction(parsed, nowMs);
   useTransactionStore.getState().addTransaction(card ? { ...txData, cardId: card.id } : txData);
 
   if (card) {

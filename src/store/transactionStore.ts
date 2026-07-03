@@ -31,6 +31,11 @@ export interface Transaction {
   status:       TxStatus;
   rawText?:     string;
   confidence:   "high" | "low";
+  ref?:         string;       // UPI Ref / RRN / Txn ID — primary cross-source dedup key
+  ingestedAt?:  number;       // epoch ms the notification actually arrived — real
+                              // arrival time, NOT the message's stated date (which
+                              // is often day-granular). Time-window dedup fallback
+                              // when no ref is present.
 }
 
 interface TransactionStore {
