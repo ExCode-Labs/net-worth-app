@@ -19,7 +19,7 @@
         "backgroundImage": "./assets/background.png",
         "monochromeImage": "./assets/monochrome.png"
       },
-      "predictiveBackGestureEnabled": true,
+      "predictiveBackGestureEnabled": false,
       "package": "com.excodelabs.networth",
       "permissions": [],
       "allowBackup": false
